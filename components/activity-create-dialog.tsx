@@ -2,41 +2,19 @@
 
 import React, { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
-} from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger, } from "@/components/ui/sheet";
 import { toast } from "sonner";
 
-import {
-    Field,
-    FieldContent,
-    FieldDescription,
-    FieldGroup,
-    FieldLabel,
-    FieldSet,
-    FieldTitle,
-} from "@/components/ui/field";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel, FieldSet, FieldTitle, } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-
-import {
-    Empty,
-    EmptyContent,
-    EmptyDescription,
-    EmptyHeader,
-    EmptyMedia,
-    EmptyTitle,
-} from "@/components/ui/empty";
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle, } from "@/components/ui/empty";
 
 import { Spinner } from "@/components/ui/spinner";
 import { CancelDialog } from "./activity-cancel-dialog";
 import { OutboundSheet } from "./activity-sheet-outbound";
 import { InboundSheet } from "./activity-sheet-inbound";
 import { QuotationSheet } from "./activity-sheet-quotation";
+import { SOSheet } from "./activity-sheet-so";
 
 interface Activity {
     id: string;
@@ -65,6 +43,10 @@ interface Activity {
     project_name?: string;
     quotation_number?: string;
     quotation_amount?: string;
+
+    // sales order fields
+    so_number?: string;
+    so_amount?: string;
 
     date_followup?: string;
     remarks: string;
@@ -137,6 +119,9 @@ export function CreateActivityDialog({
     const [quotationNumber, setQuotationNumber] = useState("");
     const [quotationAmount, setQuotationAmount] = useState("");
 
+    const [soNumber, setSoNumber] = useState("");
+    const [soAmount, setSoAmount] = useState("");
+
     const [followUpDate, setFollowUpDate] = useState("");
     const [status, setStatus] = useState("");
     const [remarks, setRemarks] = useState("");
@@ -164,6 +149,8 @@ export function CreateActivityDialog({
         projectName: "",
         quotationNumber: "",
         quotationAmount: "",
+        soNumber: "",
+        soAmount: "",
         followUpDate: "",
         status: "",
         remarks: "",
@@ -184,6 +171,8 @@ export function CreateActivityDialog({
         setProjectName(initialState.projectName);
         setQuotationNumber(initialState.quotationNumber);
         setQuotationAmount(initialState.quotationAmount);
+        setSoNumber(initialState.soNumber);
+        setSoAmount(initialState.soAmount);
         setFollowUpDate(initialState.followUpDate);
         setStatus(initialState.status);
         setRemarks(initialState.remarks);
@@ -338,6 +327,9 @@ export function CreateActivityDialog({
             project_name: projectName || undefined,
             quotation_number: quotationNumber || undefined,
             quotation_amount: quotationAmount || undefined,
+
+            so_number: soNumber || undefined,
+            so_amount: soAmount || undefined,
 
             date_followup: followUpDate || undefined,
             remarks,
@@ -509,6 +501,18 @@ export function CreateActivityDialog({
                                                     </Field>
                                                 </FieldLabel>
 
+                                                <FieldLabel>
+                                                    <Field orientation="horizontal">
+                                                        <FieldContent>
+                                                            <FieldTitle>Sales Order Preparation</FieldTitle>
+                                                            <FieldDescription>
+                                                                Prepare and submit sales orders for clients including pricing and project details.
+                                                            </FieldDescription>
+                                                        </FieldContent>
+                                                        <RadioGroupItem value="Sales Order Preparation" />
+                                                    </Field>
+                                                </FieldLabel>
+
                                             </RadioGroup>
                                         </FieldSet>
                                     </FieldGroup>
@@ -591,6 +595,29 @@ export function CreateActivityDialog({
                                     handleNext={handleNext}
                                 />
                             )}
+
+                            {typeActivity === "Sales Order Preparation" && (
+                                <SOSheet
+                                    step={step}
+                                    setStep={setStep}
+                                    source={source}
+                                    setSource={setSource}
+                                    soNumber={soNumber}
+                                    setSoNumber={setSoNumber}
+                                    soAmount={soAmount}
+                                    setSoAmount={setSoAmount}
+                                    callType={callType}
+                                    setCallType={setCallType}
+                                    remarks={remarks}
+                                    setRemarks={setRemarks}
+                                    status={status}
+                                    setStatus={setStatus}
+                                    handleBack={handleBack}
+                                    handleNext={handleNext}
+                                />
+
+                            )}
+
 
                             {/* Only show Save Activity button if status and remarks are filled */}
                             {status.trim() && remarks.trim() ? (

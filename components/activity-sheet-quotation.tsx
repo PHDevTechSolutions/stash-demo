@@ -364,7 +364,7 @@ export function QuotationSheet(props: Props) {
                         The quotation process is complete and finalized.
                       </FieldDescription>
                     </FieldContent>
-                    <RadioGroupItem value="Quote Done" />
+                    <RadioGroupItem value="Quote-Done" />
                   </Field>
                 </FieldLabel>
               </RadioGroup>

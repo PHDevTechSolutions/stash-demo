@@ -264,62 +264,60 @@ export const Progress: React.FC<NewTaskProps> = ({
 
                         return (
                             <AccordionItem key={item.id} value={item.id}>
-                                <AccordionItem key={item.id} value={item.id}>
-                                    {/* Header container */}
-                                    <div className="p-2 cursor-pointer select-none">
-                                        <div className="flex justify-between items-center">
-                                            {/* Company name */}
-                                            <AccordionTrigger className="flex-1 text-xs font-semibold">
-                                                {item.company_name}
-                                            </AccordionTrigger>
+                                {/* Header container */}
+                                <div className="p-2 cursor-pointer select-none">
+                                    <div className="flex justify-between items-center">
+                                        {/* Company name */}
+                                        <AccordionTrigger className="flex-1 text-xs font-semibold">
+                                            {item.company_name}
+                                        </AccordionTrigger>
 
-                                            {/* Action buttons */}
-                                            <div className="flex gap-2 ml-4">
-                                                <CreateActivityDialog
-                                                    target_quota={target_quota}
-                                                    referenceid={item.referenceid}
-                                                    tsm={item.tsm}
-                                                    manager={item.manager}
-                                                    type_client={item.type_client}
-                                                    activityReferenceNumber={item.activity_reference_number}
-                                                    accountReferenceNumber={item.account_reference_number}
-                                                    onCreated={(newActivity) => setActivities((curr) => [...curr, newActivity])}
-                                                />
+                                        {/* Action buttons */}
+                                        <div className="flex gap-2 ml-4">
+                                            <CreateActivityDialog
+                                                target_quota={target_quota}
+                                                referenceid={item.referenceid}
+                                                tsm={item.tsm}
+                                                manager={item.manager}
+                                                type_client={item.type_client}
+                                                activityReferenceNumber={item.activity_reference_number}
+                                                accountReferenceNumber={item.account_reference_number}
+                                                onCreated={(newActivity) => setActivities((curr) => [...curr, newActivity])}
+                                            />
 
-                                                <Button
-                                                    type="button"
-                                                    variant="secondary"
-                                                    disabled={updatingId === item.id}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        openDoneDialog(item.id);
-                                                    }}
-                                                >
-                                                    {updatingId === item.id ? "Updating..." : "Done"}
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {/* Badge below company name and buttons */}
-                                        <div className="ml-1">
-                                            <Badge variant={badgeColor} className="text-[8px]">
-                                                {item.status.replace("-", " ")}
-                                            </Badge>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                disabled={updatingId === item.id}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    openDoneDialog(item.id);
+                                                }}
+                                            >
+                                                {updatingId === item.id ? "Updating..." : "Done"}
+                                            </Button>
                                         </div>
                                     </div>
 
-                                    <AccordionContent className="text-xs px-4 py-2">
-                                        <p>
-                                            <strong>Contact Number:</strong> {item.contact_number}
-                                        </p>
-                                        <p>
-                                            <strong>Account Reference Number:</strong> {item.account_reference_number}
-                                        </p>
-                                        <p>
-                                            <strong>Date Created:</strong> {new Date(item.date_created).toLocaleDateString()}
-                                        </p>
-                                    </AccordionContent>
-                                </AccordionItem>
+                                    {/* Badge below company name and buttons */}
+                                    <div className="ml-1">
+                                        <Badge variant={badgeColor} className="text-[8px]">
+                                            {item.status.replace("-", " ")}
+                                        </Badge>
+                                    </div>
+                                </div>
+
+                                <AccordionContent className="text-xs px-4 py-2">
+                                    <p>
+                                        <strong>Contact Number:</strong> {item.contact_number}
+                                    </p>
+                                    <p>
+                                        <strong>Account Reference Number:</strong> {item.account_reference_number}
+                                    </p>
+                                    <p>
+                                        <strong>Date Created:</strong> {new Date(item.date_created).toLocaleDateString()}
+                                    </p>
+                                </AccordionContent>
                             </AccordionItem>
                         );
                     })}
