@@ -59,7 +59,6 @@ const data = {
         { name: "Deletion", url: "/companies/remove", emoji: "🗑️" },
         { name: "Follow Ups", url: "/companies/followup", emoji: "🔁" },
         { name: "Group Affiliate", url: "/companies/group", emoji: "👥" },
-        { name: "Client History", url: "#", emoji: "📜" },
         { name: "Pending Accounts", url: "/companies/pending", emoji: "🔁" }, // For TSM and Manager
         { name: "Pending Transferred", url: "/companies/transfer", emoji: "🔁" }, // For TSM and Manager
         { name: "Account Deletion", url: "/companies/approval", emoji: "🗑️" }, // For TSM and Manager
