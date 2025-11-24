@@ -24,7 +24,7 @@ export function TeamSwitcher({
         <SidebarMenuButton className="w-full px-2 py-1.5">
           <div className="flex items-center mr-2">
             <Image
-              src="/taskflow.png"
+              src="/Taskflow.png"
               alt="Taskflow Logo"
               width={28}
               height={28}
