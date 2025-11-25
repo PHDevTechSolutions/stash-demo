@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectContent, SelectItem, } from "@/components/ui/select";
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { AlertCircleIcon } from "lucide-react"; // or wherever your icon is from
 
 // Levenshtein Distance for fuzzy matching duplicates
 function levenshtein(a: string, b: string) {
@@ -20,10 +22,10 @@ function levenshtein(a: string, b: string) {
         b[i - 1] === a[j - 1]
           ? matrix[i - 1][j - 1]
           : Math.min(
-              matrix[i - 1][j - 1] + 1,
-              matrix[i][j - 1] + 1,
-              matrix[i - 1][j] + 1
-            );
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
     }
   }
 
@@ -34,8 +36,8 @@ function levenshtein(a: string, b: string) {
 function cleanCompanyName(name: string) {
   if (!name) return "";
   let n = name.toUpperCase();
-  n = n.replace(/[-_.]/g, ""); // remove special chars
-  n = n.replace(/\s+/g, " ").trim();
+  n = n.replace(/[-_.@!$%]/g, ""); // remove special chars
+  n = n.replace(/\s+/g, " ").trim(); // remove extra spaces
   n = n.replace(/\d+$/g, ""); // trailing digits removal
   return n.trim();
 }
@@ -147,6 +149,11 @@ interface AccountFormData {
   company_group: string;
 }
 
+interface Agent {
+  referenceid: string;
+  firstname: string;
+}
+
 interface UserDetails {
   referenceid: string;
   tsm: string;
@@ -194,13 +201,46 @@ export function AccountDialog({
   });
 
   const [companyError, setCompanyError] = useState("");
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
+  const [agentsError, setAgentsError] = useState<string | null>(null);
   const [duplicateInfo, setDuplicateInfo] = useState<
-    Array<{ company_name: string; owner_referenceid: string }>
+    Array<{ company_name: string; owner_referenceid: string; owner_firstname?: string }>
   >([]);
   const [isCheckingDuplicate, setIsCheckingDuplicate] = useState(false);
 
   const submitLock = useRef(false);
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!userDetails.referenceid) return;
+
+    async function fetchAgents() {
+      setAgentsLoading(true);
+      setAgentsError(null);
+      try {
+        // Use your actual API endpoint here
+        const res = await fetch(`/api/fetch-all-user-transfer`);
+        if (!res.ok) throw new Error("Failed to fetch agents");
+        const data = await res.json();
+
+        // Normalize keys to lowercase and concatenate firstname + lastname
+        const normalizedAgents = data.map((agent: any) => ({
+          referenceid: agent.ReferenceID,
+          firstname: `${agent.Firstname} ${agent.Lastname}`.trim(),
+        }));
+
+        setAgents(normalizedAgents);
+      } catch (err) {
+        setAgentsError((err as Error).message || "Failed to load agents");
+        setAgents([]);
+      } finally {
+        setAgentsLoading(false);
+      }
+    }
+
+    fetchAgents();
+  }, [userDetails.referenceid]);
 
   useEffect(() => {
     if (mode === "edit") {
@@ -251,9 +291,7 @@ export function AccountDialog({
       const signal = controller.signal;
 
       fetch(
-        `/api/com-check-duplicate-account?company_name=${encodeURIComponent(
-          cleaned
-        )}`,
+        `/api/com-check-duplicate-account?company_name=${encodeURIComponent(cleaned)}`,
         { signal }
       )
         .then(async (res) => {
@@ -261,28 +299,37 @@ export function AccountDialog({
           const data: DuplicateCheckResponse = await res.json();
 
           if (data.exists && data.companies.length > 0) {
-            // Filter companies with fuzzy distance <= 2
             const similarCompanies = data.companies.filter((c) => {
               const dist = levenshtein(cleaned, cleanCompanyName(c.company_name));
               return dist <= 2;
             });
 
-            if (similarCompanies.length > 0) {
-              // Check if owned by others
-              const otherOwner = similarCompanies.find(
+            // Add owner_firstname by matching with agents
+            const similarCompaniesWithNames = similarCompanies.map((company) => {
+              const agent = agents.find(
+                (a) => a.referenceid === company.owner_referenceid
+              );
+              return {
+                ...company,
+                owner_firstname: agent ? agent.firstname : company.owner_referenceid, // fallback
+              };
+            });
+
+            if (similarCompaniesWithNames.length > 0) {
+              const otherOwner = similarCompaniesWithNames.find(
                 (c) => c.owner_referenceid !== userDetails.referenceid
               );
 
               if (otherOwner) {
                 setCompanyError(
-                  `Duplicate company owned by another TSA (RefID: ${otherOwner.owner_referenceid})`
+                  `Duplicate company owned by another TSA: "${otherOwner.owner_firstname}"`
                 );
               } else {
                 setCompanyError(
-                  `Possible duplicate detected (owned by you): "${similarCompanies[0].company_name}"`
+                  `Possible duplicate detected (owned by you): "${similarCompaniesWithNames[0].company_name}"`
                 );
               }
-              setDuplicateInfo(similarCompanies);
+              setDuplicateInfo(similarCompaniesWithNames);
             } else {
               setCompanyError("");
               setDuplicateInfo([]);
@@ -294,20 +341,20 @@ export function AccountDialog({
         })
         .catch((err) => {
           if (err.name !== "AbortError") {
-            console.error("Duplicate check failed:", err);
             setCompanyError("Failed to validate company name");
             setDuplicateInfo([]);
           }
         })
         .finally(() => setIsCheckingDuplicate(false));
 
+      // Cleanup: abort fetch if component unmounts or company_name changes
       return () => controller.abort();
     }, 500);
 
     return () => {
       if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
     };
-  }, [formData.company_name, userDetails.referenceid, mode]);
+  }, [formData.company_name, userDetails.referenceid, mode, agents]);
 
   function handleSubmit() {
     if (submitLock.current) return;
@@ -404,17 +451,21 @@ export function AccountDialog({
             )}
 
             {duplicateInfo.length > 0 && (
-              <div className="mt-2 text-sm">
-                <p>Possible duplicates:</p>
-                <ul className="list-disc ml-5">
-                  {duplicateInfo.map((dup, idx) => (
-                    <li key={idx}>
-                      {dup.company_name} — Owner RefID: {dup.owner_referenceid}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              <Alert variant="destructive" className="mt-2">
+                <AlertCircleIcon className="mr-2 h-5 w-5 text-green-500" />
+                <div>
+                  <AlertTitle>Possible Duplicate Companies Found</AlertTitle>
+                  <AlertDescription>
+                    {duplicateInfo.map((dup) => (
+                      <div key={dup.owner_referenceid}>
+                        {dup.company_name} — Agent: <span className="capitalize">{dup.owner_firstname}</span>
+                      </div>
+                    ))}
+                  </AlertDescription>
+                </div>
+              </Alert>
             )}
+
           </div>
 
           {/* Contact Person(s) */}

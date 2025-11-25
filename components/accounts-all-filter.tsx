@@ -98,7 +98,7 @@ export function AccountsActiveFilter({
                     <div className="space-y-4 mt-4">
                         {/* Agent Filter */}
                         <div>
-                            <label className="block mb-1 font-medium">Agent</label>
+                            <label className="block mb-1 font-medium text-xs">Agent</label>
                             <Select value={agentFilter} onValueChange={setAgentFilterAction}>
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Agent" />
@@ -115,7 +115,7 @@ export function AccountsActiveFilter({
 
                         {/* Type Client Filter */}
                         <div>
-                            <label className="block mb-1 font-medium">Type Client</label>
+                            <label className="block mb-1 font-medium text-xs">Type Client</label>
                             <Select value={typeFilter} onValueChange={setTypeFilterAction}>
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Type Client" />
@@ -133,7 +133,7 @@ export function AccountsActiveFilter({
 
                         {/* Status Filter */}
                         <div>
-                            <label className="block mb-1 font-medium">Status</label>
+                            <label className="block mb-1 font-medium text-xs">Status</label>
                             <Select value={statusFilter} onValueChange={setStatusFilterAction}>
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Status" />
@@ -150,7 +150,7 @@ export function AccountsActiveFilter({
 
                         {/* Industry Filter */}
                         <div>
-                            <label className="block mb-1 font-medium">Industry</label>
+                            <label className="block mb-1 font-medium text-xs">Industry</label>
                             <Select value={industryFilter} onValueChange={setIndustryFilterAction}>
                                 <SelectTrigger className="w-full">
                                     <SelectValue placeholder="Industry" />
@@ -167,7 +167,7 @@ export function AccountsActiveFilter({
 
                         {/* Advanced Filters */}
                         <div>
-                            <label className="block mb-1 font-medium">Advanced Filters</label>
+                            <label className="block mb-1 font-medium text-xs">Advanced Filters</label>
                             <div className="space-y-2 mt-2">
                                 <div>
                                     <label className="block mb-1 font-medium text-xs">

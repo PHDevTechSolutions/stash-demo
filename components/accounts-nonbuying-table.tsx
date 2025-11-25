@@ -385,14 +385,6 @@ export function AccountsTable({
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
                 {/* Left side: Add Account + Search */}
                 <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <AccountDialog
-                        mode="create"
-                        userDetails={userDetails}
-                        onSaveAction={onSaveAccountAction}
-                        open={isCreateDialogOpen}
-                        onOpenChangeAction={setIsCreateDialogOpen}
-                    />
-
                     <div className="flex-grow w-full max-w-lg">
                         <AccountsActiveSearch
                             globalFilter={globalFilter}
