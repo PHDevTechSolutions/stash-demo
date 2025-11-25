@@ -56,14 +56,75 @@ function containsDisallowedAbbreviation(name: string) {
 }
 
 const INDUSTRY_OPTIONS = [
-  "Manufacturing",
-  "Retail",
-  "Construction",
-  "No Industry",
+  "ACCOMMODATION_AND_FOOD_SERVICE_ACTIVITIES",
+  "ACTIVITIES_OF_EXTRATERRITORIAL_ORGANIZATIONS_AND_BODIES",
+  "ACTIVITIES_OF_HOUSEHOLDS_AS_EMPLOYERS_UNDIFFERENTIATED_GOODS_AND_SERVICES_PRODUCING_ACTIVITIES_OF_HOUSEHOLDS_FOR_OWN_USE",
+  "ADMINISTRATIVE_AND_SUPPORT_SERVICE_ACTIVITIES",
+  "ADVERTISING_AND_MARKETING",
+  "AGRICULTURE_FORESTRY_AND_FISHING",
+  "ARTS_ENTERTAINMENT_AND_RECREATION",
+  "AUTOMOTIVE",
+  "B2C_BUSINESS_TO_CONSUMER",
+  "B2G_BUSINESS_TO_GOVERNMENT",
+  "CEMETERY_SERVICES",
+  "COMMUNITY_MANAGEMENT",
+  "CONSTRUCTION",
+  "EDUCATION",
+  "EDUCATION_AND_HUMAN_HEALTH_AND_SOCIAL_WORK_ACTIVITIES",
+  "EDUCATION_AND_TRAINING",
+  "ELECTRICITY_GAS_STEAM_AND_AIR_CONDITIONING_SUPPLY",
+  "ENGINEERING",
+  "FINANCIAL_AND_INSURANCE_ACTIVITIES",
+  "FOOD_AND_BEVERAGE",
+  "FORMATION_AND_COMMUNICATIO",
+  "FUNERAL_SERVICES",
+  "HEALTHCARE_AND_SERVICES",
+  "HUMAN_HEALTH_AND_SOCIAL_WORK_ACTIVITIES",
+  "INDIVIDUAL",
+  "INDUSTRIAL_SAFETY",
+  "INDUSTRY",
+  "INFORMATION_AND_COMMUNICATION",
+  "INSURANCE",
+  "LOGISTICS_AND_TRANSPORTATION",
+  "MANUFACTURING",
+  "MINING_AND_QUARRYING",
+  "OTHER_SERVICE_ACTIVITIES",
+  "PAINTS_USED_IN_BUILDING",
+  "PROFESSIONAL_SCIENTIFIC_AND_TECHNICAL_ACTIVITIES",
+  "PUBLIC_ADMINISTRATION_AND_DEFENSE_COMPULSORY_SOCIAL_SECURITY",
+  "REAL_ESTATE_ACTIVITIES",
+  "RENEWABLE_ENERGY_HYDROPOWER",
+  "SUPPORT_SERVICE_ACTIVITIES_OR_PROFESSIONAL_TECHNICAL_SERVICES",
+  "TECHNICAL_ACTIVITIES",
+  "TRADING",
+  "TRANSPORTATION_AND_STORAGE",
+  "WATER_SUPPLY_SEWERAGE_WASTE_MANAGEMENT_AND_REMEDIATION_ACTIVITIES",
+  "WHOLESALE_AND_RETAIL_TRADE",
+  "OTHER",
 ];
 
 const TYPECLIENT_OPTIONS = [
   "TSA CLIENT",
+];
+
+const AREA_OPTIONS = [
+  "Region I - Ilocos Region",
+  "Region II - Cagayan Valley",
+  "Region III - Central Luzon",
+  "Region IV - CALABARZON",
+  "Region V - Bicol Region",
+  "Region VI - Western Visayas",
+  "Region VII - Central Visayas",
+  "Region VIII - Eastern Visayas",
+  "Region IX - Zamboanga Peninsula",
+  "Region X - Northern Mindanao",
+  "Region XI - Davao Region",
+  "Region XII - SOCCSKSARGEN",
+  "NCR",
+  "CAR",
+  "BARMM",
+  "Region XIII - Caraga",
+  "MIMAROPA Region",
 ];
 
 interface AccountFormData {
@@ -483,13 +544,21 @@ export function AccountDialog({
 
           {/* Region */}
           <div>
-            <Input
-              required
-              name="region"
-              value={formData.region}
-              onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-              placeholder="Region"
-            />
+            <Select
+              value={formData.type_client}
+              onValueChange={(value) => setFormData({ ...formData, type_client: value })}
+            >
+              <SelectTrigger className="w-full">
+                <span>{formData.region}</span>
+              </SelectTrigger>
+              <SelectContent>
+                {AREA_OPTIONS.map((region) => (
+                  <SelectItem key={region} value={region}>
+                    {region}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Type Client */}
