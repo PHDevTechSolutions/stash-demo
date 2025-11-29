@@ -96,12 +96,12 @@ const data = {
       name: "Work Management",
       icon: Briefcase,
       pages: [
-        { name: "Activity Planner", url: "/activity/planner", icon: Target },
-        { name: "Task List", url: "/activity/tasklist", icon: ClipboardList },
+        //{ name: "Activity Planner", url: "/activity/planner", icon: Target },
+        //{ name: "Task List", url: "/activity/tasklist", icon: ClipboardList },
         // name: "Manual Task", url: "/activity/manual", icon: Edit2 },
-        { name: "Notes", url: "/activity/notes", icon: FileText },
+        //{ name: "Notes", url: "/activity/notes", icon: FileText },
         //{ name: "Quotation", url: "#", icon: MessageSquare },
-        { name: "Client Coverage Guide", url: "/activity/ccg", icon: Compass },
+        //{ name: "Client Coverage Guide", url: "/activity/ccg", icon: Compass },
       ],
     },
     {
