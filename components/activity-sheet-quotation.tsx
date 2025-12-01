@@ -22,6 +22,14 @@ interface Props {
   setProductQuantity: (v: string) => void;
   productAmount: string;
   setProductAmount: (v: string) => void;
+  productDescription: string;
+  setProductDescription: (v: string) => void;
+  productPhoto: string;
+  setProductPhoto: (v: string) => void;
+  productSku: string;           // comma separated SKUs (first SKU if multiple)
+  setProductSku: (v: string) => void;
+  productTitle: string;         // comma separated titles
+  setProductTitle: (v: string) => void;
   projectType: string;
   setProjectType: (v: string) => void;
   projectName: string;
@@ -77,6 +85,10 @@ export function QuotationSheet(props: Props) {
     productCat, setProductCat,
     productQuantity, setProductQuantity,
     productAmount, setProductAmount,
+    productDescription, setProductDescription,
+    productPhoto, setProductPhoto,
+    productSku, setProductSku,
+    productTitle, setProductTitle,
     projectType, setProjectType,
     projectName, setProjectName,
     quotationNumber, setQuotationNumber,
@@ -98,16 +110,43 @@ export function QuotationSheet(props: Props) {
   const [visibleDescriptions, setVisibleDescriptions] = useState<Record<number, boolean>>({});
   const [isManualEntry, setIsManualEntry] = useState(false);
 
-  // Sync productCat JSON string when selectedProducts changes
   useEffect(() => {
     const ids = selectedProducts.map((p) => p.id.toString());
     const quantities = selectedProducts.map((p) => p.quantity.toString());
     const amounts = selectedProducts.map((p) => p.price.toString());
 
+    // Extract only the first table block from description
+    const descriptions = selectedProducts
+      .map((p) => p.description || "")
+      .map((desc) => extractTable(desc))
+      .filter((tableHtml) => tableHtml.trim() !== "");
+
+    const photos = selectedProducts.map((p) => p.images?.[0]?.src || "");
+    const skus = selectedProducts.map((p) => (p.skus && p.skus.length > 0 ? p.skus[0] : ""));
+    const titles = selectedProducts.map((p) => p.title);
+
     setProductCat(ids.join(","));
     setProductQuantity(quantities.join(","));
     setProductAmount(amounts.join(","));
-  }, [selectedProducts, setProductCat, setProductQuantity, setProductAmount]);
+    setProductDescription(descriptions.join("||")); // Only table HTML here
+    setProductPhoto(photos.join(","));
+    setProductSku(skus.join(","));
+    setProductTitle(titles.join(","));
+  }, [
+    selectedProducts,
+    setProductCat,
+    setProductQuantity,
+    setProductAmount,
+    setProductDescription,
+    setProductPhoto,
+    setProductSku,
+    setProductTitle,
+  ]);
+
+  function extractTable(html: string): string {
+    const match = html.match(/<table[\s\S]*?<\/table>/i);
+    return match ? match[0] : "";
+  }
 
   // Auto compute total quotation amount when selectedProducts changes
   useEffect(() => {
@@ -430,8 +469,8 @@ export function QuotationSheet(props: Props) {
                   You chose to manually enter quotation details. Please proceed to the next step.
                 </p>
               )}
-              
-              {!isManualEntry && (
+
+              {!isManualEntry && selectedProducts.length > 0 && (
                 <Alert variant="default">
                   <AlertTitle>Grand Total: ₱</AlertTitle>
                   <AlertDescription>
@@ -439,6 +478,7 @@ export function QuotationSheet(props: Props) {
                   </AlertDescription>
                 </Alert>
               )}
+
             </FieldSet>
           </FieldGroup>
 

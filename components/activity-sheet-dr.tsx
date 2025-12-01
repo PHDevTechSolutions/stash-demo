@@ -178,6 +178,7 @@ export function DRSheet(props: Props) {
                                 value={drNumber}
                                 onChange={(e) => setDrNumber(e.target.value)}
                                 placeholder="Enter DR Number"
+                                className="uppercase"
                             />
                         </FieldSet>
 

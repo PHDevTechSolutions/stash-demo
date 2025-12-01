@@ -18,6 +18,9 @@ interface Company {
     company_name: string;
     contact_number?: string;
     type_client?: string;
+    email_address?: string;
+    address?: string;
+    contact_person?: string;
 }
 
 interface Activity {
@@ -192,6 +195,9 @@ export const Progress: React.FC<NewTaskProps> = ({
                 company_name: company?.company_name ?? "Unknown Company",
                 contact_number: company?.contact_number ?? "-",
                 type_client: company?.type_client ?? "",
+                contact_person: company?.contact_person ?? "",
+                email_address: company?.email_address ?? "",
+                address: company?.address ?? "",
             };
         })
         .sort(
@@ -306,12 +312,17 @@ export const Progress: React.FC<NewTaskProps> = ({
                                                 manager={item.manager}
                                                 type_client={item.type_client}
                                                 contact_number={item.contact_number}
+                                                email_address={item.email_address}
                                                 activityReferenceNumber={item.activity_reference_number}
+                                                company_name={item.company_name}
+                                                contact_person={item.contact_person}
+                                                address={item.address}
                                                 accountReferenceNumber={item.account_reference_number}
                                                 onCreated={() => {
                                                     fetchActivities();
                                                 }}
                                             />
+
 
                                             <Button
                                                 type="button"
@@ -335,17 +346,11 @@ export const Progress: React.FC<NewTaskProps> = ({
                                 </div>
 
                                 <AccordionContent className="text-xs px-4 py-2">
-                                    <p>
-                                        <strong>Contact Number:</strong> {item.contact_number}
-                                    </p>
-                                    <p>
-                                        <strong>Account Reference Number:</strong>{" "}
-                                        {item.account_reference_number}
-                                    </p>
-                                    <p>
-                                        <strong>Date Created:</strong>{" "}
-                                        {new Date(item.date_created).toLocaleDateString()}
-                                    </p>
+                                    <p><strong>Contact Person:</strong> {item.contact_person}</p>
+                                    <p><strong>Contact Number:</strong> {item.contact_number}</p>
+                                    <p><strong>Email Address:</strong> {item.email_address}</p>
+                                    <p><strong>Address:</strong> {item.address}</p>
+                                    <p><strong>Date Created:</strong>{" "}{new Date(item.date_created).toLocaleDateString()}</p>
                                 </AccordionContent>
                             </AccordionItem>
                         );

@@ -42,6 +42,11 @@ interface Activity {
     product_category?: string;
     product_quantity?: string;
     product_amount?: string;
+    product_description?: string;
+    product_photo?: string;
+    product_sku?: string;
+    product_title?: string;
+
     project_type?: string;
     project_name?: string;
     quotation_number?: string;
@@ -71,6 +76,10 @@ interface CreateActivityDialogProps {
     target_quota?: string;
     type_client: string;
     contact_number: string;
+    email_address: string;
+    contact_person: string;
+    address: string;
+    company_name: string;
     activityReferenceNumber?: string;
     accountReferenceNumber?: string;
 }
@@ -104,6 +113,10 @@ export function CreateActivityDialog({
     manager,
     type_client,
     contact_number,
+    company_name,
+    contact_person,
+    email_address,
+    address,
     activityReferenceNumber,
     accountReferenceNumber,
 }: CreateActivityDialogProps) {
@@ -126,6 +139,11 @@ export function CreateActivityDialog({
     const [productCat, setProductCat] = useState("");
     const [productAmount, setProductAmount] = useState("");
     const [productQuantity, setProductQuantity] = useState("");
+    const [productDescription, setProductDescription] = useState("");
+    const [productPhoto, setProductPhoto] = useState("");
+    const [productSku, setProductSku] = useState("");
+    const [productTitle, setProductTitle] = useState("");
+
     const [projectType, setProjectType] = useState("");
     const [projectName, setProjectName] = useState("");
     const [quotationNumber, setQuotationNumber] = useState("");
@@ -163,6 +181,10 @@ export function CreateActivityDialog({
         productCat: "",
         productQuantity: "",
         productAmount: "",
+        productDescription: "",
+        productPhoto: "",
+        productSku: "",
+        productTitle: "",
         projectType: "",
         projectName: "",
         quotationNumber: "",
@@ -186,6 +208,10 @@ export function CreateActivityDialog({
         setProductCat(initialState.productCat);
         setProductQuantity(initialState.productQuantity);
         setProductAmount(initialState.productAmount);
+        setProductDescription(initialState.productDescription);
+        setProductPhoto(initialState.productPhoto);
+        setProductSku(initialState.productSku);
+        setProductTitle(initialState.productTitle);
         setProjectType(initialState.projectType);
         setProjectName(initialState.projectName);
         setQuotationNumber(initialState.quotationNumber);
@@ -279,6 +305,13 @@ export function CreateActivityDialog({
         }
     };
 
+    const today = new Date();
+    const formattedDate = today.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+    });
+
     const handleSave = async () => {
         setLoading(true);
 
@@ -304,6 +337,11 @@ export function CreateActivityDialog({
             product_category: productCat || undefined,
             product_quantity: productQuantity || undefined,
             product_amount: productAmount || undefined,
+            product_description: productDescription || undefined,
+            product_photo: productPhoto || undefined,
+            product_sku: productSku || undefined,
+            product_title: productTitle || undefined,
+
             project_type: projectType || undefined,
             project_name: projectName || undefined,
             quotation_number: quotationNumber || undefined,
@@ -355,19 +393,67 @@ export function CreateActivityDialog({
             }
 
             toast.success("Activity created and status updated successfully!");
+
+            if (typeActivity === "Quotation Preparation") {
+                const descriptionTable = 
+                `<table>
+                <tr><td>${productTitle || ""}</td></tr>
+                <tr><td>${productSku || ""}</td></tr>
+                <tr><td>${productDescription || ""}</td></tr>
+                </table>
+                `;
+
+                const items = [
+                    {
+                        itemNo: 1,
+                        qty: Number(productQuantity),
+                        referencePhoto: productPhoto || "",
+                        description: descriptionTable,
+                        unitPrice: Number(productAmount) / Number(productQuantity || 1),
+                        totalAmount: Number(productAmount),
+                    },
+                ];
+
+                const quotationData = {
+                    referenceNo: quotationNumber || activityRef,
+                    date: formattedDate,
+                    companyName: company_name,
+                    address: address,
+                    telNo: contact_number,
+                    email: email_address,
+                    attention: `${contact_person}, ${address}`,
+                    subject: "Quotation Subject",
+                    items,
+                    vatType: "Vat Inc",
+                    totalPrice: Number(quotationAmount),
+                };
+
+                // Call server API to generate Excel
+                const res = await fetch("/api/quotation", {
+                    method: "POST",
+                    body: JSON.stringify(quotationData),
+                });
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `Quotation_${quotationData.referenceNo}.xlsx`;
+                a.click();
+            }
+
             onCreated(newActivity);
 
             resetForm();
             setStep(1);
             setSheetOpen(false);
-            onCreated(newActivity);
-
         } catch (error) {
             toast.error("Server error. Please try again.");
         } finally {
             setLoading(false);
         }
     };
+
 
     // Intercept sheet close request:
     const onSheetOpenChange = (open: boolean) => {
@@ -392,6 +478,7 @@ export function CreateActivityDialog({
         setShowConfirmCancel(false);
         setSheetOpen(true);
     };
+
 
     return (
         <>
@@ -576,6 +663,14 @@ export function CreateActivityDialog({
                                     setProductQuantity={setProductQuantity}
                                     productAmount={productAmount}
                                     setProductAmount={setProductAmount}
+                                    productDescription={productDescription}
+                                    setProductDescription={setProductDescription}
+                                    productPhoto={productPhoto}
+                                    setProductPhoto={setProductPhoto}
+                                    productSku={productSku}
+                                    setProductSku={setProductSku}
+                                    productTitle={productTitle}
+                                    setProductTitle={setProductTitle}
                                     projectType={projectType}
                                     setProjectType={setProjectType}
                                     projectName={projectName}

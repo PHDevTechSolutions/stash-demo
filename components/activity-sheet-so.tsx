@@ -205,6 +205,7 @@ export function SOSheet(props: Props) {
                                 value={soNumber}
                                 onChange={(e) => setSoNumber(e.target.value)}
                                 placeholder="Enter SO Number"
+                                className="uppercase"
                             />
                         </FieldSet>
 

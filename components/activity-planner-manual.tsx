@@ -592,15 +592,8 @@ export const Manual: React.FC<ManualProps> = ({
                     </div>
 
                     <AccordionContent className="text-xs px-4 py-2">
-                      <p>
-                        <strong>Contact Number:</strong> {item.contact_number}
-                      </p>
-                      <p>
-                        <strong>Account Reference Number:</strong> {item.account_reference_number}
-                      </p>
-                      <p>
-                        <strong>Date Created:</strong> {new Date(item.date_created).toLocaleDateString()}
-                      </p>
+                      <p><strong>Contact Number:</strong> {item.contact_number}</p>
+                      <p><strong>Date Created:</strong> {new Date(item.date_created).toLocaleDateString()}</p>
                     </AccordionContent>
                   </AccordionItem>
                 );
