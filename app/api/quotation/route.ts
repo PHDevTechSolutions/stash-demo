@@ -511,44 +511,135 @@ export async function POST(req: Request) {
   addFooterRowFullWidth(sheet, "Disruptive Solutions Inc");
   addFooterRow(sheet, "");
 
-  const rowUnderline = sheet.addRow([]);
-  sheet.mergeCells(rowUnderline.number, 1, rowUnderline.number, 3);
-  sheet.mergeCells(rowUnderline.number, 5, rowUnderline.number, 6);
-  rowUnderline.getCell(1).value = "_________________________";
-  rowUnderline.getCell(1).alignment = { horizontal: "left" };
-  rowUnderline.getCell(5).value = "_________________________";
-  rowUnderline.getCell(5).alignment = { horizontal: "right" };
+  // === Underline Row 1 (Sales Rep underline only, no underline on right side) ===
+  const rowUnderline1 = sheet.addRow([]);
+  sheet.mergeCells(rowUnderline1.number, 1, rowUnderline1.number, 3);
+  rowUnderline1.getCell(1).value = "_________________________"; // Sales Rep underline only
+  rowUnderline1.getCell(1).alignment = { horizontal: "left" };
+  // Right side blank, merged but no underline
+  sheet.mergeCells(rowUnderline1.number, 5, rowUnderline1.number, 6);
+  rowUnderline1.getCell(5).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowUnderline1.number);
 
-  // Clear borders and white background on underline row
-  clearBordersAndSetWhiteFill(sheet, rowUnderline.number);
+  // === Row 2 (Names: Sales Rep & blank right side) ===
+  const rowNames = sheet.addRow([]);
+  sheet.mergeCells(rowNames.number, 1, rowNames.number, 3);
+  rowNames.getCell(1).value = data.salesRepresentative || "";
+  rowNames.getCell(1).alignment = { horizontal: "left" };
+  sheet.mergeCells(rowNames.number, 5, rowNames.number, 6);
+  rowNames.getCell(5).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowNames.number);
 
-  // Add Sales Representative (left) and Company Authorized Representative (right)
-  const rowTitles = sheet.addRow([]);
-  sheet.mergeCells(rowTitles.number, 1, rowTitles.number, 3);
-  sheet.mergeCells(rowTitles.number, 5, rowTitles.number, 6);
-  rowTitles.getCell(1).value = "SALES REPRESENTATIVE";
-  rowTitles.getCell(1).alignment = { horizontal: "left" };
-  rowTitles.getCell(5).value = "COMPANY AUTHORIZED REPRESENTATIVE";
-  rowTitles.getCell(5).alignment = { horizontal: "right" };
+  // === Row 3 (Mobile and Email for Sales Rep, right side empty) ===
+  // Mobile
+  const rowMobile = sheet.addRow([]);
+  sheet.mergeCells(rowMobile.number, 1, rowMobile.number, 3);
+  rowMobile.getCell(1).value = `Mobile: ${data.salescontact || ""}`;
+  rowMobile.getCell(1).alignment = { horizontal: "left" };
+  sheet.mergeCells(rowMobile.number, 5, rowMobile.number, 6);
+  rowMobile.getCell(5).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowMobile.number);
 
-  // Clear borders and white background on titles row
-  clearBordersAndSetWhiteFill(sheet, rowTitles.number);
+  // Email
+  const rowEmail = sheet.addRow([]);
+  sheet.mergeCells(rowEmail.number, 1, rowEmail.number, 3);
+  rowEmail.getCell(1).value = `Email: ${data.salesemail || ""}`;
+  rowEmail.getCell(1).alignment = { horizontal: "left" };
+  sheet.mergeCells(rowEmail.number, 5, rowEmail.number, 6);
+  rowEmail.getCell(5).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowEmail.number);
 
   addFooterRow(sheet, "");
 
-  // Add Date lines (left and right)
-  const rowDates = sheet.addRow([]);
-  sheet.mergeCells(rowDates.number, 1, rowDates.number, 3);
-  sheet.mergeCells(rowDates.number, 5, rowDates.number, 6);
-  rowDates.getCell(1).value = "Date: _______________";
-  rowDates.getCell(1).alignment = { horizontal: "left" };
-  rowDates.getCell(5).value = "Date: _______________";
-  rowDates.getCell(5).alignment = { horizontal: "right" };
+  // === Company Authorized Representative section ===
+  // Title row
+  const rowAuthorizedTitle = sheet.addRow([]);
+  sheet.mergeCells(rowAuthorizedTitle.number, 5, rowAuthorizedTitle.number, 6);
+  rowAuthorizedTitle.getCell(5).value = "Company Authorized Representative";
+  rowAuthorizedTitle.getCell(5).alignment = { horizontal: "right" };
+  sheet.mergeCells(rowAuthorizedTitle.number, 1, rowAuthorizedTitle.number, 3);
+  rowAuthorizedTitle.getCell(1).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowAuthorizedTitle.number);
+
+  // Note row
+  const rowAuthorizedNote = sheet.addRow([]);
+  sheet.mergeCells(rowAuthorizedNote.number, 5, rowAuthorizedNote.number, 6);
+  rowAuthorizedNote.getCell(5).value = "(Please Sign Over Printed Name)";
+  rowAuthorizedNote.getCell(5).alignment = { horizontal: "right" };
+  sheet.mergeCells(rowAuthorizedNote.number, 1, rowAuthorizedNote.number, 3);
+  rowAuthorizedNote.getCell(1).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowAuthorizedNote.number);
+
+  // Underline only for Company Authorized Representative (right side)
+  const rowAuthorizedUnderline = sheet.addRow([]);
+  sheet.mergeCells(rowAuthorizedUnderline.number, 5, rowAuthorizedUnderline.number, 6);
+  rowAuthorizedUnderline.getCell(5).value = "_________________________";
+  rowAuthorizedUnderline.getCell(5).alignment = { horizontal: "right" };
+  sheet.mergeCells(rowAuthorizedUnderline.number, 1, rowAuthorizedUnderline.number, 3);
+  rowAuthorizedUnderline.getCell(1).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowAuthorizedUnderline.number);
+
   addFooterRow(sheet, "");
+
+  // === Underline Row 2 (Approve By & Payment Release Date) ===
+  const rowUnderline2 = sheet.addRow([]);
+  sheet.mergeCells(rowUnderline2.number, 1, rowUnderline2.number, 3);
+  sheet.mergeCells(rowUnderline2.number, 5, rowUnderline2.number, 6);
+  rowUnderline2.getCell(1).value = "_________________________"; // Approve By underline (Sales Manager)
+  rowUnderline2.getCell(1).alignment = { horizontal: "left" };
+  rowUnderline2.getCell(5).value = "_________________________"; // Payment Release Date underline
+  rowUnderline2.getCell(5).alignment = { horizontal: "right" };
+  clearBordersAndSetWhiteFill(sheet, rowUnderline2.number);
+
+  // === Row 3 (Approve By title & Payment Release Date label) ===
+  const rowApprovePayment = sheet.addRow([]);
+  sheet.mergeCells(rowApprovePayment.number, 1, rowApprovePayment.number, 3);
+  sheet.mergeCells(rowApprovePayment.number, 5, rowApprovePayment.number, 6);
+  rowApprovePayment.getCell(1).value = "Approve By\nSales Manager";
+  rowApprovePayment.getCell(1).alignment = { horizontal: "left", vertical: "middle", wrapText: true };
+  rowApprovePayment.getCell(5).value = "Payment Release Date";
+  rowApprovePayment.getCell(5).alignment = { horizontal: "right" };
+  clearBordersAndSetWhiteFill(sheet, rowApprovePayment.number);
+
+  // === Row 4 (Mobile and Email for Sales Manager, empty right side) ===
+  const rowManagerMobile = sheet.addRow([]);
+  sheet.mergeCells(rowManagerMobile.number, 1, rowManagerMobile.number, 3);
+  rowManagerMobile.getCell(1).value = `Mobile: ${data.salesManagerContact || ""}`;
+  rowManagerMobile.getCell(1).alignment = { horizontal: "left" };
+  sheet.mergeCells(rowManagerMobile.number, 5, rowManagerMobile.number, 6);
+  rowManagerMobile.getCell(5).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowManagerMobile.number);
+
+  const rowManagerEmail = sheet.addRow([]);
+  sheet.mergeCells(rowManagerEmail.number, 1, rowManagerEmail.number, 3);
+  rowManagerEmail.getCell(1).value = `Email: ${data.salesManagerEmail || ""}`;
+  rowManagerEmail.getCell(1).alignment = { horizontal: "left" };
+  sheet.mergeCells(rowManagerEmail.number, 5, rowManagerEmail.number, 6);
+  rowManagerEmail.getCell(5).value = "";
+  clearBordersAndSetWhiteFill(sheet, rowManagerEmail.number);
+
   addFooterRow(sheet, "");
-  addFooterRow(sheet, "");
-  // Clear borders and white background on dates row
-  clearBordersAndSetWhiteFill(sheet, rowDates.number);
+
+  // === Underline Row 3 (Sales Head-B2B & Position in the Company) ===
+  const rowUnderline3 = sheet.addRow([]);
+  sheet.mergeCells(rowUnderline3.number, 1, rowUnderline3.number, 3);
+  sheet.mergeCells(rowUnderline3.number, 5, rowUnderline3.number, 6);
+  rowUnderline3.getCell(1).value = "_________________________"; // Sales Head-B2B underline
+  rowUnderline3.getCell(1).alignment = { horizontal: "left" };
+  rowUnderline3.getCell(5).value = "_________________________"; // Position in the Company underline
+  rowUnderline3.getCell(5).alignment = { horizontal: "right" };
+  clearBordersAndSetWhiteFill(sheet, rowUnderline3.number);
+
+  // === Row 4 (Sales Head-B2B & Position in the Company labels) ===
+  const rowHeadPosition = sheet.addRow([]);
+  sheet.mergeCells(rowHeadPosition.number, 1, rowHeadPosition.number, 3);
+  sheet.mergeCells(rowHeadPosition.number, 5, rowHeadPosition.number, 6);
+  rowHeadPosition.getCell(1).value = "Sales Head-B2B";
+  rowHeadPosition.getCell(1).alignment = { horizontal: "left" };
+  rowHeadPosition.getCell(5).value = "Position in the Company";
+  rowHeadPosition.getCell(5).alignment = { horizontal: "right" };
+  clearBordersAndSetWhiteFill(sheet, rowHeadPosition.number);
+
 
   // Set column widths
   sheet.columns = [

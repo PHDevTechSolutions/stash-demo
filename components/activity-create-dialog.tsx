@@ -71,6 +71,10 @@ interface Activity {
 interface CreateActivityDialogProps {
     onCreated: (newActivity: Activity) => void;
     referenceid: string;
+    firstname: string;
+    lastname: string;
+    email: string;
+    contact: string;
     tsm: string;
     manager: string;
     target_quota?: string;
@@ -108,6 +112,10 @@ function SpinnerEmpty({ onCancel }: { onCancel?: () => void }) {
 export function CreateActivityDialog({
     onCreated,
     referenceid,
+    firstname,
+    lastname,
+    email,
+    contact,
     target_quota,
     tsm,
     manager,
@@ -404,6 +412,9 @@ export function CreateActivityDialog({
                 const skus = productSku ? productSku.split(",") : [];
                 // For descriptions, using "||" as separator as per your original code
                 const descriptions = productDescription ? productDescription.split("||") : [];
+                const salesRepresentativeName = `${firstname} ${lastname}`;
+                const salesemail = `${email}`;
+                const salescontact = `${contact}`;
 
                 // Map into items array
                 const items = productCats.map((_, index) => {
@@ -415,10 +426,10 @@ export function CreateActivityDialog({
                     const description = descriptions[index] || "";
 
                     const descriptionTable = `<table>
-          <tr><td>${title}</td></tr>
-          <tr><td>${sku}</td></tr>
-          <tr><td>${description}</td></tr>
-        </table>`;
+                    <tr><td>${title}</td></tr>
+                    <tr><td>${sku}</td></tr>
+                    <tr><td>${description}</td></tr>
+                    </table>`;
 
                     return {
                         itemNo: index + 1,
@@ -442,6 +453,9 @@ export function CreateActivityDialog({
                     items, // multiple items here
                     vatType: "Vat Inc",
                     totalPrice: Number(quotationAmount),
+                    salesRepresentative: salesRepresentativeName,
+                    salesemail: salesemail,
+                    salescontact: salescontact,
                 };
 
                 // Call server API to generate Excel

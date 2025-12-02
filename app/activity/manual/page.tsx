@@ -39,6 +39,10 @@ interface UserDetails {
     referenceid: string;
     tsm: string;
     manager: string;
+    firstname: string;
+    lastname: string;
+    email: string;
+    contact: string;
     target_quota: string;
 }
 
@@ -50,6 +54,10 @@ function DashboardContent() {
         referenceid: "",
         tsm: "",
         manager: "",
+        firstname: "",
+        lastname: "",
+        email: "",
+        contact: "",
         target_quota: "",
     });
 
@@ -93,6 +101,10 @@ function DashboardContent() {
                     referenceid: data.ReferenceID || "",
                     tsm: data.TSM || "",
                     manager: data.Manager || "",
+                    firstname: data.Firstname || "",
+                    lastname: data.Lastname || "",
+                    email: data.Email || "",
+                    contact: data.Contact || "",
                     target_quota: data.TargetQuota || "",
                 });
 
@@ -153,6 +165,10 @@ function DashboardContent() {
                             referenceid={userDetails.referenceid}
                             tsm={userDetails.tsm}
                             manager={userDetails.manager}
+                            firstname={userDetails.firstname}
+                            lastname={userDetails.lastname}
+                            email={userDetails.email}
+                            contact={userDetails.contact}
                             target_quota={userDetails.target_quota}
                             dateCreatedFilterRange={dateCreatedFilterRange}
                             setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction} />

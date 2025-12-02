@@ -53,6 +53,10 @@ interface ManualProps {
   tsm: string;
   manager: string;
   referenceid: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  contact: string;
   target_quota?: string;
   dateCreatedFilterRange: DateRange | undefined;
   setDateCreatedFilterRangeAction: React.Dispatch<
@@ -64,6 +68,10 @@ export const Manual: React.FC<ManualProps> = ({
   tsm,
   manager,
   referenceid,
+  firstname,
+  lastname,
+  email,
+  contact,
   target_quota,
   dateCreatedFilterRange,
   setDateCreatedFilterRangeAction,
@@ -563,7 +571,11 @@ export const Manual: React.FC<ManualProps> = ({
 
                         <div className="flex gap-2 ml-4">
                           <CreateActivityDialog
+                            firstname={firstname}
+                            lastname={lastname}
                             target_quota={target_quota}
+                            email={email}
+                            contact={contact}
                             referenceid={item.referenceid}
                             tsm={item.tsm}
                             manager={item.manager}

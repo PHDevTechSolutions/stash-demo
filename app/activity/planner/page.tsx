@@ -46,6 +46,10 @@ interface UserDetails {
     tsm: string;
     manager: string;
     target_quota: string;
+    firstname: string;
+    lastname: string;
+    email: string;
+    contact: string;
 }
 
 function DashboardContent() {
@@ -57,6 +61,10 @@ function DashboardContent() {
         tsm: "",
         manager: "",
         target_quota: "",
+        firstname: "",
+        lastname: "",
+        email: "",
+        contact: "",
     });
 
     const [posts, setPosts] = useState<Account[]>([]);
@@ -100,6 +108,10 @@ function DashboardContent() {
                     tsm: data.TSM || "",
                     manager: data.Manager || "",
                     target_quota: data.TargetQuota || "",
+                    firstname: data.Firstname || "",
+                    lastname: data.Lastname || "",
+                    email: data.Email || "",
+                    contact: data.ContactNumber || "",
                 });
 
                 toast.success("User data loaded successfully!");
@@ -177,6 +189,10 @@ function DashboardContent() {
                             <CardContent>
                                 <Progress
                                     referenceid={userDetails.referenceid}
+                                    firstname={userDetails.firstname}
+                                    lastname={userDetails.lastname}
+                                    email={userDetails.email}
+                                    contact={userDetails.contact}
                                     target_quota={userDetails.target_quota}
                                     dateCreatedFilterRange={dateCreatedFilterRange}
                                     setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction} />

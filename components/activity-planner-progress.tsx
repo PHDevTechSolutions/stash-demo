@@ -39,6 +39,10 @@ interface Activity {
 interface NewTaskProps {
     referenceid: string;
     target_quota?: string;
+    firstname: string;
+    lastname: string;
+    email: string;
+    contact: string;
     dateCreatedFilterRange: DateRange | undefined;
     setDateCreatedFilterRangeAction: React.Dispatch<
         React.SetStateAction<DateRange | undefined>
@@ -48,6 +52,10 @@ interface NewTaskProps {
 export const Progress: React.FC<NewTaskProps> = ({
     referenceid,
     target_quota,
+    firstname,
+    lastname,
+    email,
+    contact,
     dateCreatedFilterRange,
     setDateCreatedFilterRangeAction,
 }) => {
@@ -306,7 +314,11 @@ export const Progress: React.FC<NewTaskProps> = ({
 
                                         <div className="flex gap-2 ml-4">
                                             <CreateActivityDialog
+                                                firstname={firstname}
+                                                lastname={lastname}
                                                 target_quota={target_quota}
+                                                email={email}
+                                                contact={contact}
                                                 referenceid={item.referenceid}
                                                 tsm={item.tsm}
                                                 manager={item.manager}
