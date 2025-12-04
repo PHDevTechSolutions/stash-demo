@@ -350,7 +350,7 @@ export const SOTable: React.FC<SOProps> = ({
                             ))}
                         </TableBody>
                         <tfoot>
-                            <TableRow className="bg-muted font-semibold">
+                            <TableRow className="bg-muted font-semibold text-xs">
                                 <TableCell colSpan={2} className="text-right pr-4">
                                     Totals:
                                 </TableCell>

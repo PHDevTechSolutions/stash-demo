@@ -13,13 +13,14 @@ interface Company {
     account_reference_number: string;
     company_name?: string;
     contact_number?: string;
+    contact_person?: string;
     type_client?: string;
 }
 
-interface Quotation {
+interface SI {
     id: number;
-    quotation_number?: string;
-    quotation_amount?: number;
+    actual_sales?: number;
+    dr_number?: string;
     remarks?: string;
     date_created: string;
     date_updated?: string;
@@ -28,9 +29,11 @@ interface Quotation {
     contact_number?: string;
     type_activity: string;
     status: string;
+    delivery_date: string;
+    payment_terms: string;
 }
 
-interface QuotationProps {
+interface SIProps {
     referenceid: string;
     target_quota?: string;
     dateCreatedFilterRange: any;
@@ -39,14 +42,14 @@ interface QuotationProps {
 
 const PAGE_SIZE = 10;
 
-export const QuotationTable: React.FC<QuotationProps> = ({
+export const SITable: React.FC<SIProps> = ({
     referenceid,
     target_quota,
     dateCreatedFilterRange,
     setDateCreatedFilterRangeAction,
 }) => {
     const [companies, setCompanies] = useState<Company[]>([]);
-    const [activities, setActivities] = useState<Quotation[]>([]);
+    const [activities, setActivities] = useState<SI[]>([]);
     const [loadingCompanies, setLoadingCompanies] = useState(false);
     const [loadingActivities, setLoadingActivities] = useState(false);
     const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
@@ -113,8 +116,8 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                     filter: `referenceid=eq.${referenceid}`,
                 },
                 (payload) => {
-                    const newRecord = payload.new as Quotation;
-                    const oldRecord = payload.old as Quotation;
+                    const newRecord = payload.new as SI;
+                    const oldRecord = payload.old as SI;
 
                     setActivities((curr) => {
                         switch (payload.eventType) {
@@ -151,6 +154,7 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                     ...history,
                     company_name: company?.company_name ?? "Unknown Company",
                     contact_number: company?.contact_number ?? "-",
+                    contact_person: company?.contact_person ?? "-",
                 };
             })
             .sort(
@@ -165,12 +169,12 @@ export const QuotationTable: React.FC<QuotationProps> = ({
         const search = searchTerm.toLowerCase();
 
         return mergedActivities
-            .filter((item) => item.type_activity?.toLowerCase() === "quotation preparation")
+            .filter((item) => item.type_activity?.toLowerCase() === "delivered / closed transaction")
             .filter((item) => {
                 if (!search) return true;
                 return (
                     (item.company_name?.toLowerCase().includes(search) ?? false) ||
-                    (item.quotation_number?.toLowerCase().includes(search) ?? false) ||
+                    (item.dr_number?.toLowerCase().includes(search) ?? false) ||
                     (item.remarks?.toLowerCase().includes(search) ?? false)
                 );
             })
@@ -186,9 +190,9 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                     return true;
                 }
 
-                const updatedDate = item.date_updated
-                    ? new Date(item.date_updated)
-                    : new Date(item.date_created);
+                const updatedDate = item.delivery_date
+                    ? new Date(item.delivery_date)
+                    : new Date(item.delivery_date);
 
                 if (isNaN(updatedDate.getTime())) return false;
 
@@ -220,14 +224,14 @@ export const QuotationTable: React.FC<QuotationProps> = ({
 
     // Calculate totals for footer (for filteredActivities, not paginated subset)
     const totalQuotationAmount = useMemo(() => {
-        return filteredActivities.reduce((acc, item) => acc + (item.quotation_amount ?? 0), 0);
+        return filteredActivities.reduce((acc, item) => acc + (item.actual_sales ?? 0), 0);
     }, [filteredActivities]);
 
     // Count unique quotation_number (non-null)
     const uniqueQuotationCount = useMemo(() => {
         const uniqueSet = new Set<string>();
         filteredActivities.forEach((item) => {
-            if (item.quotation_number) uniqueSet.add(item.quotation_number);
+            if (item.dr_number) uniqueSet.add(item.dr_number);
         });
         return uniqueSet.size;
     }, [filteredActivities]);
@@ -308,7 +312,7 @@ export const QuotationTable: React.FC<QuotationProps> = ({
             {/* Total info */}
             {filteredActivities.length > 0 && (
                 <div className="mb-2 text-xs font-bold">
-                    Total Activities: {filteredActivities.length} | Unique Quotations: {uniqueQuotationCount}
+                    Total Activities: {filteredActivities.length} | Unique DR Number: {uniqueQuotationCount}
                 </div>
             )}
 
@@ -318,36 +322,40 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                     <Table>
                         <TableHeader>
                             <TableRow>
-                                <TableHead className="w-[120px] text-xs">Date Created</TableHead>
-                                <TableHead className="text-xs">Quotation Number</TableHead>
-                                <TableHead className="text-right text-xs">Quotation Amount</TableHead>
+                                <TableHead className="w-[120px] text-xs">Delivery Date</TableHead>
+                                <TableHead className="text-xs">SI Amount</TableHead>
+                                <TableHead className="text-xs">DR Number</TableHead>
                                 <TableHead className="text-xs">Company Name</TableHead>
+                                <TableHead className="text-xs">Contact Person</TableHead>
                                 <TableHead className="text-xs">Contact Number</TableHead>
                                 <TableHead className="text-xs">Remarks</TableHead>
+                                <TableHead className="text-xs">Payment Terms</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {paginatedActivities.map((item) => (
                                 <TableRow key={item.id} className="hover:bg-muted/30 text-xs">
-                                    <TableCell>{new Date(item.date_created).toLocaleDateString()}</TableCell>
-                                    <TableCell className="uppercase">{item.quotation_number || "-"}</TableCell>
+                                    <TableCell>{new Date(item.delivery_date).toLocaleDateString()}</TableCell>
                                     <TableCell className="text-right">
-                                        {item.quotation_amount !== undefined && item.quotation_amount !== null
-                                            ? item.quotation_amount.toLocaleString(undefined, {
+                                        {item.actual_sales !== undefined && item.actual_sales !== null
+                                            ? item.actual_sales.toLocaleString(undefined, {
                                                 style: "currency",
                                                 currency: "PHP",
                                             })
                                             : "-"}
                                     </TableCell>
+                                    <TableCell className="uppercase">{item.dr_number || "-"}</TableCell>
                                     <TableCell>{item.company_name}</TableCell>
+                                    <TableCell>{item.contact_person}</TableCell>
                                     <TableCell>{item.contact_number}</TableCell>
                                     <TableCell className="capitalize">{item.remarks || "-"}</TableCell>
+                                    <TableCell>{item.payment_terms}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
                         <tfoot>
                             <TableRow className="bg-muted font-semibold text-xs">
-                                <TableCell colSpan={2} className="text-right pr-4">
+                                <TableCell colSpan={1} className="text-right pr-4">
                                     Totals:
                                 </TableCell>
                                 <TableCell className="text-right">
@@ -356,7 +364,7 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                                         currency: "PHP",
                                     })}
                                 </TableCell>
-                                <TableCell colSpan={3}></TableCell>
+                                <TableCell colSpan={6}></TableCell>
                             </TableRow>
                         </tfoot>
                     </Table>

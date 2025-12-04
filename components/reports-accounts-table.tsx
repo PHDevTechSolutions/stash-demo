@@ -6,31 +6,44 @@ import { AlertCircleIcon, CheckCircle2Icon } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { supabase } from "@/utils/supabase";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow, } from "@/components/ui/table";
-import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, } from "@/components/ui/pagination";
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    Pagination,
+    PaginationContent,
+    PaginationItem,
+    PaginationPrevious,
+    PaginationNext,
+} from "@/components/ui/pagination";
 
 interface Company {
     account_reference_number: string;
     company_name?: string;
     contact_number?: string;
+    contact_person?: string;
     type_client?: string;
 }
 
-interface Quotation {
+interface Account {
     id: number;
-    quotation_number?: string;
-    quotation_amount?: number;
+    actual_sales?: number;
     remarks?: string;
     date_created: string;
     date_updated?: string;
     account_reference_number?: string;
     company_name?: string;
     contact_number?: string;
-    type_activity: string;
     status: string;
+    dr_number: string;
 }
 
-interface QuotationProps {
+interface AccountProps {
     referenceid: string;
     target_quota?: string;
     dateCreatedFilterRange: any;
@@ -39,14 +52,14 @@ interface QuotationProps {
 
 const PAGE_SIZE = 10;
 
-export const QuotationTable: React.FC<QuotationProps> = ({
+export const ASTable: React.FC<AccountProps> = ({
     referenceid,
     target_quota,
     dateCreatedFilterRange,
     setDateCreatedFilterRangeAction,
 }) => {
     const [companies, setCompanies] = useState<Company[]>([]);
-    const [activities, setActivities] = useState<Quotation[]>([]);
+    const [activities, setActivities] = useState<Account[]>([]);
     const [loadingCompanies, setLoadingCompanies] = useState(false);
     const [loadingActivities, setLoadingActivities] = useState(false);
     const [errorCompanies, setErrorCompanies] = useState<string | null>(null);
@@ -55,10 +68,8 @@ export const QuotationTable: React.FC<QuotationProps> = ({
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<string>("all");
 
-    // Pagination state
     const [page, setPage] = useState(1);
 
-    // Fetch companies
     useEffect(() => {
         if (!referenceid) {
             setCompanies([]);
@@ -77,7 +88,6 @@ export const QuotationTable: React.FC<QuotationProps> = ({
             .finally(() => setLoadingCompanies(false));
     }, [referenceid]);
 
-    // Fetch activities
     const fetchActivities = useCallback(() => {
         if (!referenceid) {
             setActivities([]);
@@ -96,7 +106,6 @@ export const QuotationTable: React.FC<QuotationProps> = ({
             .finally(() => setLoadingActivities(false));
     }, [referenceid]);
 
-    // Real-time subscription using Supabase
     useEffect(() => {
         fetchActivities();
 
@@ -113,8 +122,8 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                     filter: `referenceid=eq.${referenceid}`,
                 },
                 (payload) => {
-                    const newRecord = payload.new as Quotation;
-                    const oldRecord = payload.old as Quotation;
+                    const newRecord = payload.new as Account;
+                    const oldRecord = payload.old as Account;
 
                     setActivities((curr) => {
                         switch (payload.eventType) {
@@ -123,10 +132,15 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                                     return [...curr, newRecord];
                                 }
                                 return curr;
+
                             case "UPDATE":
-                                return curr.map((a) => (a.id === newRecord.id ? newRecord : a));
+                                return curr.map((a) =>
+                                    a.id === newRecord.id ? newRecord : a
+                                );
+
                             case "DELETE":
                                 return curr.filter((a) => a.id !== oldRecord.id);
+
                             default:
                                 return curr;
                         }
@@ -140,7 +154,6 @@ export const QuotationTable: React.FC<QuotationProps> = ({
         };
     }, [referenceid, fetchActivities]);
 
-    // Merge company info into activities
     const mergedActivities = useMemo(() => {
         return activities
             .map((history) => {
@@ -151,6 +164,7 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                     ...history,
                     company_name: company?.company_name ?? "Unknown Company",
                     contact_number: company?.contact_number ?? "-",
+                    contact_person: company?.contact_person ?? "-",
                 };
             })
             .sort(
@@ -160,36 +174,39 @@ export const QuotationTable: React.FC<QuotationProps> = ({
             );
     }, [activities, companies]);
 
-    // Filter logic
     const filteredActivities = useMemo(() => {
         const search = searchTerm.toLowerCase();
 
         return mergedActivities
-            .filter((item) => item.type_activity?.toLowerCase() === "quotation preparation")
             .filter((item) => {
                 if (!search) return true;
                 return (
                     (item.company_name?.toLowerCase().includes(search) ?? false) ||
-                    (item.quotation_number?.toLowerCase().includes(search) ?? false) ||
                     (item.remarks?.toLowerCase().includes(search) ?? false)
                 );
             })
             .filter((item) => {
-                if (filterStatus !== "all" && item.status !== filterStatus) return false;
+                if (filterStatus !== "all" && item.status !== filterStatus)
+                    return false;
                 return true;
+            })
+            .filter((item) => {
+                const hasSales = item.actual_sales && Number(item.actual_sales) > 0;
+                const hasDR =
+                    item.dr_number && item.dr_number.toString().trim() !== "";
+
+                return hasSales || hasDR;
             })
             .filter((item) => {
                 if (
                     !dateCreatedFilterRange ||
-                    (!dateCreatedFilterRange.from && !dateCreatedFilterRange.to)
+                    (!dateCreatedFilterRange.from &&
+                        !dateCreatedFilterRange.to)
                 ) {
                     return true;
                 }
 
-                const updatedDate = item.date_updated
-                    ? new Date(item.date_updated)
-                    : new Date(item.date_created);
-
+                const updatedDate = new Date(item.date_created);
                 if (isNaN(updatedDate.getTime())) return false;
 
                 const fromDate = dateCreatedFilterRange.from
@@ -199,14 +216,12 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                     ? new Date(dateCreatedFilterRange.to)
                     : null;
 
-                // Helper function to check if two dates are on the same day (ignoring time)
                 const isSameDay = (d1: Date, d2: Date) =>
                     d1.getFullYear() === d2.getFullYear() &&
                     d1.getMonth() === d2.getMonth() &&
                     d1.getDate() === d2.getDate();
 
                 if (fromDate && toDate && isSameDay(fromDate, toDate)) {
-                    // Exact one-day filter: match any record in that day
                     return isSameDay(updatedDate, fromDate);
                 }
 
@@ -215,31 +230,44 @@ export const QuotationTable: React.FC<QuotationProps> = ({
 
                 return true;
             });
-
     }, [mergedActivities, searchTerm, filterStatus, dateCreatedFilterRange]);
 
-    // Calculate totals for footer (for filteredActivities, not paginated subset)
-    const totalQuotationAmount = useMemo(() => {
-        return filteredActivities.reduce((acc, item) => acc + (item.quotation_amount ?? 0), 0);
-    }, [filteredActivities]);
+    const groupedByCompany = useMemo(() => {
+        const map = new Map();
 
-    // Count unique quotation_number (non-null)
-    const uniqueQuotationCount = useMemo(() => {
-        const uniqueSet = new Set<string>();
         filteredActivities.forEach((item) => {
-            if (item.quotation_number) uniqueSet.add(item.quotation_number);
+            if (!map.has(item.company_name)) {
+                map.set(item.company_name, item);
+            }
         });
-        return uniqueSet.size;
+
+        return Array.from(map.values());
     }, [filteredActivities]);
 
-    // Pagination logic
-    const pageCount = Math.ceil(filteredActivities.length / PAGE_SIZE);
-    const paginatedActivities = useMemo(() => {
-        const start = (page - 1) * PAGE_SIZE;
-        return filteredActivities.slice(start, start + PAGE_SIZE);
-    }, [filteredActivities, page]);
+    const pageCount = Math.ceil(groupedByCompany.length / PAGE_SIZE);
 
-    // Reset to page 1 if filter or search changes
+    const paginatedGrouped = useMemo(() => {
+        const start = (page - 1) * PAGE_SIZE;
+        return groupedByCompany.slice(start, start + PAGE_SIZE);
+    }, [groupedByCompany, page]);
+
+    const totalActualSales = useMemo(() => {
+        return paginatedGrouped.reduce((sum, item) => {
+            const val = Number(item.actual_sales);
+            return sum + (isNaN(val) ? 0 : val);
+        }, 0);
+    }, [paginatedGrouped]);
+
+    const totalDRCount = useMemo(() => {
+        return paginatedGrouped.reduce((count, item) => {
+            if (item.dr_number && item.dr_number.toString().trim() !== "") {
+                return count + 1;
+            }
+            return count;
+        }, 0);
+    }, [paginatedGrouped]);
+
+
     useEffect(() => {
         setPage(1);
     }, [searchTerm, filterStatus, dateCreatedFilterRange]);
@@ -249,26 +277,22 @@ export const QuotationTable: React.FC<QuotationProps> = ({
 
     return (
         <>
-            {/* Search */}
             <div className="mb-4 flex items-center justify-between gap-4">
                 <Input
                     type="text"
-                    placeholder="Search company, quotation number or remarks..."
+                    placeholder="Search company or remarks..."
                     className="input input-bordered input-sm flex-grow max-w-md"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    aria-label="Search quotations"
                 />
             </div>
 
-            {/* Loading */}
             {isLoading && (
                 <div className="flex justify-center items-center h-40">
                     <Spinner className="size-8" />
                 </div>
             )}
 
-            {/* Error */}
             {error && (
                 <Alert variant="destructive" className="flex flex-col space-y-4 p-4 text-xs">
                     <div className="flex items-center space-x-3">
@@ -293,72 +317,84 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                 </Alert>
             )}
 
-            {/* No Data Alert */}
-            {!isLoading && !error && filteredActivities.length === 0 && (
+            {!isLoading && !error && groupedByCompany.length === 0 && (
                 <Alert variant="destructive" className="flex items-center space-x-3 p-4 text-xs">
                     <AlertCircleIcon className="h-6 w-6 text-red-600" />
                     <div>
                         <AlertTitle>No Data Found</AlertTitle>
-                        <AlertDescription>Please check your filters or try again later.</AlertDescription>
+                        <AlertDescription>Try adjusting filters or search.</AlertDescription>
                     </div>
                 </Alert>
             )}
 
-
-            {/* Total info */}
-            {filteredActivities.length > 0 && (
+            {groupedByCompany.length > 0 && (
                 <div className="mb-2 text-xs font-bold">
-                    Total Activities: {filteredActivities.length} | Unique Quotations: {uniqueQuotationCount}
+                    Total Companies: {groupedByCompany.length}
                 </div>
             )}
 
-            {/* Table */}
-            {filteredActivities.length > 0 && (
+            {groupedByCompany.length > 0 && (
                 <div className="overflow-auto custom-scrollbar rounded-md border p-4 space-y-2">
                     <Table>
                         <TableHeader>
                             <TableRow>
                                 <TableHead className="w-[120px] text-xs">Date Created</TableHead>
+                                <TableHead className="text-xs text-right">Quotation Amount</TableHead>
                                 <TableHead className="text-xs">Quotation Number</TableHead>
-                                <TableHead className="text-right text-xs">Quotation Amount</TableHead>
                                 <TableHead className="text-xs">Company Name</TableHead>
+                                <TableHead className="text-xs">Contact Person</TableHead>
                                 <TableHead className="text-xs">Contact Number</TableHead>
-                                <TableHead className="text-xs">Remarks</TableHead>
                             </TableRow>
                         </TableHeader>
+
                         <TableBody>
-                            {paginatedActivities.map((item) => (
+                            {paginatedGrouped.map((item) => (
                                 <TableRow key={item.id} className="hover:bg-muted/30 text-xs">
-                                    <TableCell>{new Date(item.date_created).toLocaleDateString()}</TableCell>
-                                    <TableCell className="uppercase">{item.quotation_number || "-"}</TableCell>
+                                    <TableCell>
+                                        {new Date(item.date_created).toLocaleDateString()}
+                                    </TableCell>
+
                                     <TableCell className="text-right">
-                                        {item.quotation_amount !== undefined && item.quotation_amount !== null
-                                            ? item.quotation_amount.toLocaleString(undefined, {
+                                        {item.actual_sales
+                                            ? item.actual_sales.toLocaleString("en-PH", {
                                                 style: "currency",
                                                 currency: "PHP",
                                             })
                                             : "-"}
                                     </TableCell>
+
+                                    <TableCell className="uppercase">
+                                        {item.dr_number || "-"}
+                                    </TableCell>
+
                                     <TableCell>{item.company_name}</TableCell>
+                                    <TableCell>{item.contact_person}</TableCell>
                                     <TableCell>{item.contact_number}</TableCell>
-                                    <TableCell className="capitalize">{item.remarks || "-"}</TableCell>
                                 </TableRow>
                             ))}
                         </TableBody>
+
                         <tfoot>
                             <TableRow className="bg-muted font-semibold text-xs">
-                                <TableCell colSpan={2} className="text-right pr-4">
+                                <TableCell colSpan={1} className="text-right pr-4">
                                     Totals:
                                 </TableCell>
-                                <TableCell className="text-right">
-                                    {totalQuotationAmount.toLocaleString(undefined, {
+
+                                <TableCell className="text-right font-bold text-xs">
+                                    {totalActualSales.toLocaleString("en-PH", {
                                         style: "currency",
                                         currency: "PHP",
                                     })}
                                 </TableCell>
+
+                                <TableCell className="font-bold text-xs">
+                                    DR Number QTY: {totalDRCount}
+                                </TableCell>
+
                                 <TableCell colSpan={3}></TableCell>
                             </TableRow>
                         </tfoot>
+
                     </Table>
                 </div>
             )}
@@ -374,11 +410,14 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                                     if (page > 1) setPage(page - 1);
                                 }}
                                 aria-disabled={page === 1}
-                                className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                                className={
+                                    page === 1
+                                        ? "pointer-events-none opacity-50"
+                                        : ""
+                                }
                             />
                         </PaginationItem>
 
-                        {/* Current page / total pages */}
                         <div className="px-4 font-medium select-none">
                             {pageCount === 0 ? "0 / 0" : `${page} / ${pageCount}`}
                         </div>
@@ -391,7 +430,11 @@ export const QuotationTable: React.FC<QuotationProps> = ({
                                     if (page < pageCount) setPage(page + 1);
                                 }}
                                 aria-disabled={page === pageCount}
-                                className={page === pageCount ? "pointer-events-none opacity-50" : ""}
+                                className={
+                                    page === pageCount
+                                        ? "pointer-events-none opacity-50"
+                                        : ""
+                                }
                             />
                         </PaginationItem>
                     </PaginationContent>
