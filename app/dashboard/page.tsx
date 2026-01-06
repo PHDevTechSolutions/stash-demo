@@ -47,6 +47,8 @@ import { toast } from "sonner";
 import { supabase } from "@/utils/supabase";
 
 import { StatusCard } from "@/components/dashboard-card-status";
+import { AssetCard } from "@/components/dashboard-card-asset_type";
+import { BrandCard } from "@/components/dashboard-card-brand";
 
 interface InventoryItem {
   id: string; // supabase id
@@ -230,21 +232,6 @@ function DashboardContent() {
     desktop,
   }));
 
-  // Chart configs
-  const chartConfigAssetType = {
-    desktop: {
-      label: "Assets",
-      color: "var(--chart-1)",
-    },
-  } satisfies ChartConfig;
-
-  const chartConfigBrand = {
-    desktop: {
-      label: "Brand",
-      color: "var(--chart-2)",
-    },
-  } satisfies ChartConfig;
-
   return (
     <>
       <SidebarLeft />
@@ -278,85 +265,18 @@ function DashboardContent() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Asset Types Distribution */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Asset Types Distribution</CardTitle>
-                    <CardDescription>Based on asset_type counts</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ChartContainer config={chartConfigAssetType}>
-                      <BarChart
-                        accessibilityLayer
-                        data={assetTypeChartData}
-                        layout="vertical"
-                        margin={{ left: -20 }}
-                      >
-                        <XAxis type="number" dataKey="desktop" hide />
-                        <YAxis
-                          dataKey="month"
-                          type="category"
-                          tickLine={false}
-                          tickMargin={10}
-                          axisLine={false}
-                          tickFormatter={(value) => value.slice(0, 10)}
-                        />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                        <Bar dataKey="desktop" fill="var(--color-desktop)" radius={5} />
-                      </BarChart>
-                    </ChartContainer>
-                  </CardContent>
-                  <CardFooter className="flex-col items-start gap-2 text-sm">
-                    <div className="flex gap-2 leading-none font-medium">
-                      Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
-                    </div>
-                    <div className="text-muted-foreground leading-none">
-                      Showing total assets grouped by type
-                    </div>
-                  </CardFooter>
-                </Card>
+                <AssetCard
+                  chartData={assetTypeChartData}
+                  title="Asset Types Distribution"
+                  description="Based on asset_type counts"
+                />
 
                 {/* Brand Distribution */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Brand Distribution</CardTitle>
-                    <CardDescription>Based on brand counts</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ChartContainer config={chartConfigBrand}>
-                      <BarChart
-                        accessibilityLayer
-                        data={brandChartData}
-                        margin={{ top: 20 }}
-                      >
-                        <CartesianGrid vertical={false} />
-                        <XAxis
-                          dataKey="month"
-                          tickLine={false}
-                          tickMargin={10}
-                          axisLine={false}
-                          tickFormatter={(value) => value.slice(0, 3)}
-                        />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                        <Bar dataKey="desktop" fill="var(--color-brand)" radius={8}>
-                          <LabelList
-                            position="top"
-                            offset={12}
-                            className="fill-foreground"
-                            fontSize={12}
-                          />
-                        </Bar>
-                      </BarChart>
-                    </ChartContainer>
-                  </CardContent>
-                  <CardFooter className="flex-col items-start gap-2 text-sm">
-                    <div className="flex gap-2 leading-none font-medium">
-                      Trending up by 5.2% this month <TrendingUp className="h-4 w-4" />
-                    </div>
-                    <div className="text-muted-foreground leading-none">
-                      Showing total assets grouped by brand
-                    </div>
-                  </CardFooter>
-                </Card>
+                <BrandCard
+                  chartData={brandChartData}
+                  title="Brand Distribution"
+                  description="Based on brand counts"
+                />
               </div>
             </>
           )}
