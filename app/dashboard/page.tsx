@@ -13,35 +13,31 @@ import {
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LabelList,
-} from "recharts";
-import { TrendingUp } from "lucide-react";
-
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemFooter,
+  ItemHeader,
+  ItemMedia,
+  ItemTitle,
+} from "@/components/ui/item"
+import { Separator } from "@/components/ui/separator"
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
-import { Separator } from "@/components/ui/separator";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
+} from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase";
@@ -55,6 +51,7 @@ interface InventoryItem {
   status: string;
   asset_type: string;
   brand: string;
+  location: string;
   date_created?: string;
 }
 
@@ -232,6 +229,11 @@ function DashboardContent() {
     desktop,
   }));
 
+  const locationCounts: Record<string, number> = {};
+  activities.forEach(({ location }) => {
+    locationCounts[location] = (locationCounts[location] ?? 0) + 1;
+  });
+
   return (
     <>
       <SidebarLeft />
@@ -277,6 +279,33 @@ function DashboardContent() {
                   title="Brand Distribution"
                   description="Based on brand counts"
                 />
+
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Location Distribution</CardTitle>
+                    <CardDescription>Count of items grouped by location</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex flex-col gap-2">
+                      {Object.entries(locationCounts).map(([location, count]) => (
+                        <Item key={location}>
+                          <Separator />
+                          <ItemContent>
+                            <div className="flex justify-between items-center w-full">
+                              <ItemTitle className="flex-1 text-left">{location}</ItemTitle>
+                              <ItemDescription className="flex-none">
+                                <Badge className="h-8 min-w-[2rem] rounded-full px-2 font-mono tabular-nums">{count}</Badge>
+                              </ItemDescription>
+                            </div>
+                          </ItemContent>
+                        </Item>
+                      ))}
+                      {Object.keys(locationCounts).length === 0 && (
+                        <p className="text-muted-foreground">No location data available.</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </>
           )}
