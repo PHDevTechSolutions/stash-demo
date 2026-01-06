@@ -125,6 +125,11 @@ export const Inventory: React.FC<TicketProps> = ({
     const [bulkOpen, setBulkOpen] = useState(false);
     const [bulkFile, setBulkFile] = useState<File | null>(null);
     const [bulkReferenceId, setBulkReferenceId] = useState(referenceid);
+
+    useEffect(() => {
+    setBulkReferenceId(referenceid);
+  }, [referenceid]);
+
     const [uploadingBulk, setUploadingBulk] = useState(false);
 
     function handleSelectChange(name: string, value: string) {
@@ -832,6 +837,7 @@ export const Inventory: React.FC<TicketProps> = ({
                             <Input
                                 value={bulkReferenceId}
                                 onChange={(e) => setBulkReferenceId(e.target.value)}
+                                disabled
                             />
                         </div>
 
@@ -841,6 +847,7 @@ export const Inventory: React.FC<TicketProps> = ({
                                 type="file"
                                 accept=".csv"
                                 onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+                                
                             />
                         </div>
 
