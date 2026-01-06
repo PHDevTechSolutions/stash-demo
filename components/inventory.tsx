@@ -850,17 +850,6 @@ export const Inventory: React.FC<TicketProps> = ({
                                 
                             />
                         </div>
-
-                        <div className="text-xs text-muted-foreground">
-                            Required headers:
-                            <br />
-                            <code>
-                                asset_tag, asset_type, status, location, new_user, old_user,
-                                department, position, brand, model, processor, ram, storage,
-                                serial_number, purchase_date, warranty_date, asset_age,
-                                amount, remarks, mac_address
-                            </code>
-                        </div>
                     </div>
 
                     <DialogFooter>
@@ -873,7 +862,6 @@ export const Inventory: React.FC<TicketProps> = ({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
 
             {/* Confirm Delete Dialog */}
             <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
