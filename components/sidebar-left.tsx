@@ -25,7 +25,7 @@ const initialUserDetails = {
 
 const data = {
   navSecondary: [{ title: "Settings", url: "/settings", icon: Settings }],
-  favorites: [{ name: "Dashboard", url: "#", icon: Gauge, isActive: true }],
+  favorites: [{ name: "Dashboard", url: "/dashboard", icon: Gauge, isActive: true }],
   workspaces: [
     {
       name: "Asset Management",
