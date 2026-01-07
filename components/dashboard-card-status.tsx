@@ -17,7 +17,7 @@ export function StatusCard({ counts, userId }: StatusCardProps) {
       {["spare", "deploy", "missing", "dispose"].map((status) => (
         <Card key={status} className="flex flex-col justify-between">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold">{status}</CardTitle>
+            <CardTitle className="text-lg font-semibold capitalize">{status}</CardTitle>
           </CardHeader>
 
           <CardContent className="flex items-center justify-between font-semibold">
@@ -33,28 +33,28 @@ export function StatusCard({ counts, userId }: StatusCardProps) {
           </CardContent>
           <Separator />
           <CardFooter className="flex justify-end gap-2">
-            {status === "Spare" && (
+            {status === "spare" && (
               <Button variant="outline" asChild>
                 <a href={`/asset/inventory?id=${encodeURIComponent(userId ?? "")}`}>
                   View Spare
                 </a>
               </Button>
             )}
-            {status === "Deploy" && (
+            {status === "deployed" && (
               <Button variant="outline" asChild>
                 <a href={`/asset/inventory?id=${encodeURIComponent(userId ?? "")}`}>
                   View Deploy
                 </a>
               </Button>
             )}
-            {status === "Missing" && (
+            {status === "missing" && (
               <Button variant="outline" asChild>
                 <a href={`/asset/inventory?id=${encodeURIComponent(userId ?? "")}`}>
                   View Missing
                 </a>
               </Button>
             )}
-            {status === "Dispose" && (
+            {status === "dispose" && (
               <Button variant="outline" asChild>
                 <a href={`/asset/disposal?id=${encodeURIComponent(userId ?? "")}`}>
                   View Dispose
