@@ -14,7 +14,7 @@ interface StatusCardProps {
 export function StatusCard({ counts, userId }: StatusCardProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-      {["spare", "deploy", "missing", "dispose"].map((status) => (
+      {["spare", "deployed", "missing", "dispose"].map((status) => (
         <Card key={status} className="flex flex-col justify-between">
           <CardHeader>
             <CardTitle className="text-lg font-semibold capitalize">{status}</CardTitle>
