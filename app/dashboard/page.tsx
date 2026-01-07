@@ -203,7 +203,7 @@ function DashboardContent() {
   ).length;
 
   const countDeploy = activities.filter(
-    (item) => normalize(item.status) === "deploy"
+    (item) => normalize(item.status) === "deployed"
   ).length;
 
   const countMissing = activities.filter(
@@ -216,7 +216,7 @@ function DashboardContent() {
 
   return {
     spare: countSpare,
-    deploy: countDeploy,
+    deployed: countDeploy,
     missing: countMissing,
     dispose: countDispose,
   };
