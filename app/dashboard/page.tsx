@@ -196,18 +196,31 @@ function DashboardContent() {
 
   // Count items by status
   const counts = React.useMemo(() => {
-    const countSpare = activities.filter((item) => item.status === "Spare").length;
-    const countDeploy = activities.filter((item) => item.status === "Deploy").length;
-    const countMissing = activities.filter((item) => item.status === "Missing").length;
-    const countDispose = activities.filter((item) => item.status === "Dispose").length;
+  const normalize = (status?: string) => status?.toLowerCase() ?? "";
 
-    return {
-      Spare: countSpare,
-      Deploy: countDeploy,
-      Missing: countMissing,
-      Dispose: countDispose,
-    };
-  }, [activities]);
+  const countSpare = activities.filter(
+    (item) => normalize(item.status) === "spare"
+  ).length;
+
+  const countDeploy = activities.filter(
+    (item) => normalize(item.status) === "deploy"
+  ).length;
+
+  const countMissing = activities.filter(
+    (item) => normalize(item.status) === "missing"
+  ).length;
+
+  const countDispose = activities.filter(
+    (item) => normalize(item.status) === "dispose"
+  ).length;
+
+  return {
+    spare: countSpare,
+    deploy: countDeploy,
+    missing: countMissing,
+    dispose: countDispose,
+  };
+}, [activities]);
 
   // Count asset_type occurrences for first chart
   const assetTypeCounts: Record<string, number> = {};
