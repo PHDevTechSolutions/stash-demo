@@ -73,9 +73,9 @@ export function StatusCard({ counts, userId }: StatusCardProps) {
   );
 
   return (
-    <div className="grid grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       {/* ALL ASSETS CARD */}
-      <Card className="flex flex-col justify-between border-primary col-span-2">
+      <Card className="flex flex-col justify-between border-primary md:col-span-2">
         <CardHeader>
           <CardTitle className="text-lg font-semibold">All Assets</CardTitle>
           <CardDescription>
@@ -112,7 +112,7 @@ export function StatusCard({ counts, userId }: StatusCardProps) {
         return (
           <Card
             key={status}
-            className="flex flex-col justify-between col-span-1"
+            className="flex flex-col justify-between md:col-span-1"
           >
             <CardHeader>
               <CardTitle className="text-lg font-semibold">{meta.title}</CardTitle>
