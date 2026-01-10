@@ -106,7 +106,13 @@ export const Disposal: React.FC<TicketProps> = ({
         model: "",
         processor: "",
         storage: "",
+        pageSize: "25",
     });
+
+    const pageSize = useMemo(() => {
+        const size = Number(filters.pageSize);
+        return Number.isFinite(size) && size > 0 ? size : 25;
+    }, [filters.pageSize]);
 
     const fetchActivities = useCallback(() => {
         if (!referenceid) {
@@ -188,6 +194,7 @@ export const Disposal: React.FC<TicketProps> = ({
             model: "",
             processor: "",
             storage: "",
+            pageSize: "25",
         });
     }
 
@@ -212,7 +219,9 @@ export const Disposal: React.FC<TicketProps> = ({
             endDate.setHours(23, 59, 59, 999);
         }
 
-        return activities.filter((item) => {
+        // Filter first
+        const filtered = activities.filter((item) => {
+            // EXCLUDE items with status "Dispose"
             if (item.status !== "Dispose") return false;
 
             const matchesSearch =
@@ -225,6 +234,8 @@ export const Disposal: React.FC<TicketProps> = ({
 
             const matchesFilters = Object.entries(filters).every(([key, filterValue]) => {
                 if (!filterValue) return true;
+                if (key === "pageSize") return true; // 👈 IMPORTANT
+
                 const itemValue = item[key as keyof DisposeItem];
                 return (
                     itemValue
@@ -248,15 +259,24 @@ export const Disposal: React.FC<TicketProps> = ({
 
             return true;
         });
+
+        // Sort descending by asset_tag
+        filtered.sort((a, b) => {
+            if (!a.asset_tag) return 1;   // Push undefined asset_tag to the end
+            if (!b.asset_tag) return -1;
+            return b.asset_tag.localeCompare(a.asset_tag);
+        });
+
+        return filtered;
     }, [activities, search, filters, dateCreatedFilterRange]);
 
 
-    const pageCount = Math.ceil(filteredActivities.length / PAGE_SIZE);
+    const pageCount = Math.ceil(filteredActivities.length / pageSize);
 
     const paginatedActivities = useMemo(() => {
-        const start = (page - 1) * PAGE_SIZE;
-        return filteredActivities.slice(start, start + PAGE_SIZE);
-    }, [filteredActivities, page]);
+        const start = (page - 1) * pageSize;
+        return filteredActivities.slice(start, start + pageSize);
+    }, [filteredActivities, page, pageSize]);
 
     function toggleSelect(id: string) {
         setSelectedIds((prev) => {
@@ -367,6 +387,7 @@ export const Disposal: React.FC<TicketProps> = ({
                             open={filterSheetOpen}
                             setOpen={setFilterSheetOpen}
                             filters={filters}
+                            setFilters={setFilters}
                             handleFilterChange={handleFilterChange}
                             resetFilters={resetFilters}
                             applyFilters={applyFilters}

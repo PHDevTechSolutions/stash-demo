@@ -37,6 +37,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge"
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
@@ -49,10 +57,13 @@ import { BrandCard } from "@/components/dashboard-card-brand";
 interface InventoryItem {
   id: string; // supabase id
   status: string;
+  asset_tag: string;
   asset_type: string;
+  model: string;
   brand: string;
   location: string;
   date_created?: string;
+  warranty_date: string;
 }
 
 interface UserDetails {
@@ -196,31 +207,31 @@ function DashboardContent() {
 
   // Count items by status
   const counts = React.useMemo(() => {
-  const normalize = (status?: string) => status?.toLowerCase() ?? "";
+    const normalize = (status?: string) => status?.toLowerCase() ?? "";
 
-  const countSpare = activities.filter(
-    (item) => normalize(item.status) === "spare"
-  ).length;
+    const countSpare = activities.filter(
+      (item) => normalize(item.status) === "spare"
+    ).length;
 
-  const countDeploy = activities.filter(
-    (item) => normalize(item.status) === "deployed"
-  ).length;
+    const countDeploy = activities.filter(
+      (item) => normalize(item.status) === "deployed"
+    ).length;
 
-  const countMissing = activities.filter(
-    (item) => normalize(item.status) === "missing"
-  ).length;
+    const countMissing = activities.filter(
+      (item) => normalize(item.status) === "missing"
+    ).length;
 
-  const countDispose = activities.filter(
-    (item) => normalize(item.status) === "dispose"
-  ).length;
+    const countDispose = activities.filter(
+      (item) => normalize(item.status) === "dispose"
+    ).length;
 
-  return {
-    spare: countSpare,
-    deployed: countDeploy,
-    missing: countMissing,
-    dispose: countDispose,
-  };
-}, [activities]);
+    return {
+      spare: countSpare,
+      deployed: countDeploy,
+      missing: countMissing,
+      dispose: countDispose,
+    };
+  }, [activities]);
 
   // Count asset_type occurrences for first chart
   const assetTypeCounts: Record<string, number> = {};
@@ -246,6 +257,35 @@ function DashboardContent() {
   activities.forEach(({ location }) => {
     locationCounts[location] = (locationCounts[location] ?? 0) + 1;
   });
+
+  const isOutOfWarranty = (warrantyDateStr?: string) => {
+    if (!warrantyDateStr) return true; // walang warranty date → treat as expired
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const warrantyDate = new Date(warrantyDateStr);
+    warrantyDate.setHours(0, 0, 0, 0);
+
+    return warrantyDate < today;
+  };
+
+  const expiredWarranties = React.useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    return activities.filter((item) => {
+      if (!item.warranty_date) return false;
+
+      const warrantyDate = new Date(item.warranty_date);
+      warrantyDate.setHours(0, 0, 0, 0);
+
+      return warrantyDate < today; // expired if warranty date is before today
+    });
+  }, [activities]);
+
+
+
 
   return (
     <>
@@ -319,6 +359,52 @@ function DashboardContent() {
                     </div>
                   </CardContent>
                 </Card>
+
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle>Out of Warranty / Expired Items</CardTitle>
+                    <CardDescription>Items with expired warranty dates</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {expiredWarranties.length === 0 ? (
+                      <p className="text-muted-foreground">No expired warranty items.</p>
+                    ) : (
+                      <Table className="text-xs">
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Asset Tag</TableHead>
+                            <TableHead>Asset Type</TableHead>
+                            <TableHead>Brand</TableHead>
+                            <TableHead>Model</TableHead>
+                            <TableHead>Warranty Date</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {expiredWarranties.map((item) => (
+                            <TableRow key={item.id} className="odd:bg-white even:bg-gray-50">
+                              <TableCell>{item.asset_tag || "-"}</TableCell>
+                              <TableCell>{item.asset_type || "-"}</TableCell>
+                              <TableCell>{item.brand || "-"}</TableCell>
+                              <TableCell>{item.model || "-"}</TableCell>
+                              <TableCell>
+                                {item.warranty_date
+                                  ? new Date(item.warranty_date).toLocaleDateString()
+                                  : "-"}
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="destructive" className="capitalize">
+                                  Expired
+                                </Badge>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+
               </div>
             </>
           )}

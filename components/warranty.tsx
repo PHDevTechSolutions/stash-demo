@@ -48,7 +48,7 @@ interface WarrantyProps {
     >;
 }
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 export const Warranty: React.FC<WarrantyProps> = ({
     referenceid,
@@ -274,7 +274,7 @@ export const Warranty: React.FC<WarrantyProps> = ({
 
     const getWarrantyInfo = (warrantyDateStr?: string) => {
         if (!warrantyDateStr) {
-            return { status: "-", days: "-" };
+            return { status: "no set purchase date", days: "-" };
         }
 
         const today = new Date();
@@ -364,7 +364,7 @@ export const Warranty: React.FC<WarrantyProps> = ({
                                             ? new Date(item.warranty_date).toLocaleDateString()
                                             : "-"}
                                     </TableCell>
-                                    <TableCell><Badge>{getWarrantyInfo(item.warranty_date).status}</Badge></TableCell>
+                                    <TableCell className="capitalize"><Badge>{getWarrantyInfo(item.warranty_date).status}</Badge></TableCell>
                                     <TableCell>{getWarrantyInfo(item.warranty_date).days}</TableCell>
                                     <TableCell className="capitalize">{item.remarks || "-"}</TableCell>
                                 </TableRow>
