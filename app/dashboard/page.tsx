@@ -225,11 +225,21 @@ function DashboardContent() {
       (item) => normalize(item.status) === "dispose"
     ).length;
 
+    const countLend = activities.filter(
+      (item) => normalize(item.status) === "lend"
+    ).length;
+
+    const countDefective = activities.filter(
+      (item) => normalize(item.status) === "defective"
+    ).length;
+
     return {
       spare: countSpare,
       deployed: countDeploy,
       missing: countMissing,
       dispose: countDispose,
+      lend: countLend,
+      defective: countDefective,
     };
   }, [activities]);
 
@@ -257,18 +267,6 @@ function DashboardContent() {
   activities.forEach(({ location }) => {
     locationCounts[location] = (locationCounts[location] ?? 0) + 1;
   });
-
-  const isOutOfWarranty = (warrantyDateStr?: string) => {
-    if (!warrantyDateStr) return true; // walang warranty date → treat as expired
-
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const warrantyDate = new Date(warrantyDateStr);
-    warrantyDate.setHours(0, 0, 0, 0);
-
-    return warrantyDate < today;
-  };
 
   const expiredWarranties = React.useMemo(() => {
     const today = new Date();
