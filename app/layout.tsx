@@ -5,6 +5,7 @@ import { UserProvider } from "@/contexts/UserContext";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Reminders } from "@/components/reminders";
+import { PopUp } from "@/components/ticket-received";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -36,6 +37,7 @@ export default function RootLayout({
         <UserProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
             <Reminders />
+            <PopUp />
             {children}
           </ThemeProvider>
           <Toaster richColors />
