@@ -97,7 +97,7 @@ function DashboardContent() {
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage className="line-clamp-1">Received Tickets</BreadcrumbPage>
+                                    <BreadcrumbPage className="line-clamp-1 font-bold uppercase">Received Tickets</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>

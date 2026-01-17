@@ -102,13 +102,28 @@ export function PopUp() {
     fetchActivities();
   }, [fetchActivities]);
 
-  // Play sound when dialog opens (once per open)
+  // Play sound when dialog opens (once per open), waiting for audio to load if needed
   useEffect(() => {
-    if (open && !soundPlayedRef.current) {
-      audioRef.current?.play().catch(() => {
-        // ignore play errors, e.g. user gesture required
-      });
-      soundPlayedRef.current = true;
+    if (open && !soundPlayedRef.current && audioRef.current) {
+      const audio = audioRef.current;
+
+      const playAudio = () => {
+        audio.play().catch(() => {
+          // Ignore errors, like user gesture required
+        });
+        soundPlayedRef.current = true;
+      };
+
+      if (audio.readyState >= 4) {
+        // Audio already loaded
+        playAudio();
+      } else {
+        // Wait until audio can play through
+        audio.oncanplaythrough = () => {
+          playAudio();
+          audio.oncanplaythrough = null; // cleanup
+        };
+      }
     }
   }, [open]);
 
@@ -131,7 +146,7 @@ export function PopUp() {
         </DialogTrigger>
       )}
 
-      <DialogContent className="fixed top-[15%] left-1/2 max-h-[75vh] w-[90vw] max-w-lg -translate-x-1/2 rounded-lg bg-white p-8 shadow-xl focus:outline-none overflow-auto">
+      <DialogContent className="fixed top-1/2 left-1/2 max-h-[75vh] w-[90vw] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-8 shadow-xl focus:outline-none overflow-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-900">
             Tickets for Maintenance or Dispose Today
@@ -156,21 +171,13 @@ export function PopUp() {
               key={ticket.id}
               className="border border-gray-200 rounded-md p-4 shadow-sm hover:shadow-md transition-shadow"
             >
-              <p className="text-lg font-semibold text-gray-900">
-                {ticket.ticket_subject}
-              </p>
-              <p className="text-sm text-gray-600">
-                Requestor: {ticket.requestor_name}
-              </p>
+              <p className="text-lg font-semibold text-gray-900">{ticket.ticket_subject}</p>
+              <p className="text-sm text-gray-600">Requestor: {ticket.requestor_name}</p>
               <p className="text-sm text-gray-600">
                 Date Created:{" "}
-                {ticket.date_created
-                  ? new Date(ticket.date_created).toLocaleString()
-                  : "-"}
+                {ticket.date_created ? new Date(ticket.date_created).toLocaleString() : "-"}
               </p>
-              <p className="text-sm text-gray-600">
-                Request Type: {ticket.request_type}
-              </p>
+              <p className="text-sm text-gray-600">Request Type: {ticket.request_type}</p>
             </div>
           ))}
         </div>
