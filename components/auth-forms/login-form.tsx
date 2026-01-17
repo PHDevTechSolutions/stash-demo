@@ -214,7 +214,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                     </form>
                     <div className="bg-muted relative hidden md:block">
                         <img
-                            src="/ecoshift-wallpaper.jpg"
+                            src="/asset.jpg"
                             alt="Image"
                             className="absolute inset-0 h-full w-full object-cover dark:brightness-[0.2] dark:grayscale"
                         />
