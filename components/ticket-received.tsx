@@ -138,14 +138,6 @@ export function PopUp() {
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      {!open && (
-        <DialogTrigger asChild>
-          <Button variant="outline" disabled={loading}>
-            {loading ? "Loading tickets..." : "Show Today's Tickets"}
-          </Button>
-        </DialogTrigger>
-      )}
-
       <DialogContent className="fixed top-1/2 left-1/2 max-h-[75vh] w-[90vw] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white p-8 shadow-xl focus:outline-none overflow-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-gray-900">
