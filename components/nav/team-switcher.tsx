@@ -20,7 +20,7 @@ export function TeamSwitcher({
         <SidebarMenuButton className="w-full pt-8 pb-8">
           <div className="flex items-center space-x-3">
             <Image
-              src="/stashminidark.png"
+              src="/asset.jpg"
               alt="Stash"
               width={40}
               height={40}
