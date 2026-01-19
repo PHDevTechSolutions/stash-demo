@@ -13,7 +13,20 @@ import { Pagination, PaginationContent, PaginationItem, PaginationNext, Paginati
 import { Badge } from "@/components/ui/badge";
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
-
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
+import {
+    Accordion,
+    AccordionContent,
+    AccordionItem,
+    AccordionTrigger,
+} from "@/components/ui/accordion";
 import { InventoryDialog } from "@/components/inventory-dialog";
 import { InventoryFilterDialog } from "@/components/inventory-filter-dialog";
 import { supabase } from "@/utils/supabase";
@@ -148,6 +161,8 @@ export const Inventory: React.FC<TicketProps> = ({
     }, [referenceid]);
 
     const [uploadingBulk, setUploadingBulk] = useState(false);
+    const [disposeSheetOpen, setDisposeSheetOpen] = useState(false);
+    const [selectedDisposeIds, setSelectedDisposeIds] = useState<Set<string>>(new Set());
 
     function handleSelectChange(name: string, value: string) {
         setForm((prev) => ({
@@ -187,7 +202,7 @@ export const Inventory: React.FC<TicketProps> = ({
                     if (!item.purchase_date) return false;
                     const purchaseDate = new Date(item.purchase_date);
                     if (isNaN(purchaseDate.getTime())) return false;
-                    return purchaseDate < fiveYearsAgo && item.status !== "Dispose";
+                    return purchaseDate < fiveYearsAgo && item.status !== "DISPOSE";
                 });
 
                 setOldItems(oldOnes);
@@ -514,21 +529,39 @@ export const Inventory: React.FC<TicketProps> = ({
         }
     }
 
-    async function updateOldItemsStatusManual() {
-        if (oldItems.length === 0) {
-            toast("No old items to update.");
+    function toggleDisposeSelect(id: string) {
+        setSelectedDisposeIds((prev) => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    }
+
+    function toggleDisposeSelectAll() {
+        if (selectedDisposeIds.size === oldItems.length) {
+            setSelectedDisposeIds(new Set());
+        } else {
+            setSelectedDisposeIds(new Set(oldItems.map((i) => i.id)));
+        }
+    }
+
+    async function confirmUpdateDispose() {
+        if (selectedDisposeIds.size === 0) {
+            toast.error("Please select at least one item to update.");
             return;
         }
 
         setUpdatingOldItems(true);
 
         try {
-            const idsToUpdate = oldItems.map(i => i.id);
-
             const res = await fetch("/api/update-status-old-items", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: idsToUpdate, newStatus: "Dispose" }),
+                body: JSON.stringify({ ids: Array.from(selectedDisposeIds), newStatus: "Dispose" }),
             });
 
             if (!res.ok) {
@@ -538,10 +571,10 @@ export const Inventory: React.FC<TicketProps> = ({
                 return;
             }
 
-            toast.success(`${idsToUpdate.length} old item(s) updated to Dispose.`);
-
-            // Refresh activities after update
+            toast.success(`${selectedDisposeIds.size} item(s) updated to Dispose.`);
             fetchActivities();
+            setDisposeSheetOpen(false);
+            setSelectedDisposeIds(new Set());
         } catch (error) {
             toast.error("Error updating old items.");
             console.error(error);
@@ -701,7 +734,6 @@ export const Inventory: React.FC<TicketProps> = ({
         URL.revokeObjectURL(url);
     }
 
-
     if (errorActivities) {
         return (
             <Alert variant="destructive" className="flex flex-col space-y-4 p-4 text-xs">
@@ -752,7 +784,7 @@ export const Inventory: React.FC<TicketProps> = ({
                     <div className="flex flex-wrap gap-2 items-center">
                         <p className="font-semibold">Total Assets ( Except Dispose Item ):</p>
                         <Badge className="bg-green-600 text-white py-2 px-4 text-sm">
-                             {totalSpareCount}
+                            {totalSpareCount}
                         </Badge>
 
                         {selectedIds.size > 0 && (
@@ -787,12 +819,13 @@ export const Inventory: React.FC<TicketProps> = ({
                             <Button
                                 variant="destructive"
                                 className="w-full sm:w-auto"
-                                onClick={updateOldItemsStatusManual}
+                                onClick={() => {
+                                    setSelectedDisposeIds(new Set()); // reset selection when opening
+                                    setDisposeSheetOpen(true);
+                                }}
                                 disabled={updatingOldItems}
                             >
-                                {updatingOldItems
-                                    ? "Updating Old Items..."
-                                    : "Update Old Items to Dispose"}
+                                {updatingOldItems ? "Updating Old Items..." : "Update Old Items to Dispose"}
                             </Button>
                         )}
 
@@ -934,6 +967,79 @@ export const Inventory: React.FC<TicketProps> = ({
                     </div>
                 </>
             )}
+
+            <Sheet open={disposeSheetOpen} onOpenChange={setDisposeSheetOpen}>
+                <SheetContent className="max-w-3xl">
+                    <SheetHeader>
+                        <SheetTitle>Update Old Items to Dispose</SheetTitle>
+                        <SheetDescription>
+                            Select the items you want to mark as Dispose.
+                        </SheetDescription>
+                    </SheetHeader>
+
+                    <div className="overflow-auto max-h-[60vh] mt-4 p-4">
+                        <Accordion type="multiple" className="w-full">
+                            {/* Select All Checkbox */}
+                            <div className="flex items-center mb-4">
+                                <input
+                                    type="checkbox"
+                                    id="selectAllDispose"
+                                    className="mr-2"
+                                    checked={selectedDisposeIds.size === oldItems.length && oldItems.length > 0}
+                                    onChange={toggleDisposeSelectAll}
+                                />
+                                <label htmlFor="selectAllDispose" className="font-semibold">Select All</label>
+                            </div>
+
+                            {oldItems.map((item) => (
+                                <AccordionItem key={item.id} value={item.id}>
+                                    <AccordionTrigger className="flex justify-between items-center">
+                                        <div className="space-x-2">
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedDisposeIds.has(item.id)}
+                                                onChange={(e) => {
+                                                    e.stopPropagation(); // prevent accordion toggle on checkbox click
+                                                    toggleDisposeSelect(item.id);
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="ml-4"
+                                            />
+                                            <span>{item.asset_tag || "No Asset Tag"}</span>
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="px-4 pb-4">
+                                        <div className="grid grid-cols-1 gap-4 text-sm">
+                                            <div><strong>Model:</strong> {item.model || "-"}</div>
+                                            <div><strong>Brand:</strong> {item.brand || "-"}</div>
+                                            <div><strong>Department:</strong> {item.department || "-"}</div>
+                                            <div><strong>Location:</strong> {item.location || "-"}</div>
+                                            <div><strong>Asset Type:</strong> {item.asset_type || "-"}</div>
+                                            <div><strong>Status:</strong> {item.status || "-"}</div>
+                                            <div><strong>Serial Number:</strong> {item.serial_number || "-"}</div>
+                                            <div><strong>Purchase Date:</strong> {item.purchase_date || "-"}</div>
+                                            <div><strong>Remarks:</strong> {item.remarks || "-"}</div>
+                                        </div>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            ))}
+                        </Accordion>
+                    </div>
+
+                    <div className="flex justify-end gap-3 mt-6">
+                        <Button variant="outline" onClick={() => setDisposeSheetOpen(false)} disabled={updatingOldItems}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={confirmUpdateDispose}
+                            disabled={updatingOldItems || selectedDisposeIds.size === 0}
+                        >
+                            {updatingOldItems ? "Updating..." : "Update Selected"}
+                        </Button>
+                    </div>
+                </SheetContent>
+            </Sheet>
 
             <InventoryDialog
                 open={open}
