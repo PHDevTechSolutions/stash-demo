@@ -664,7 +664,8 @@ export const Inventory: React.FC<TicketProps> = ({
 
     useEffect(() => {
         setPage(1);
-    }, [pageSize]);
+    }, [search, filters]);
+
 
     function convertToCSV(items: InventoryItem[]) {
         if (items.length === 0) return "";
@@ -834,10 +835,10 @@ export const Inventory: React.FC<TicketProps> = ({
                             setOpen={setFilterSheetOpen}
                             filters={filters}
                             setFilters={setFilters}
-                            handleFilterChange={handleFilterChange}
                             resetFilters={resetFilters}
                             applyFilters={applyFilters}
                         />
+
                     </div>
                 </div>
             </CardHeader>

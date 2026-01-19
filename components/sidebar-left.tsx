@@ -49,7 +49,7 @@ const data = {
         { name: "Inventory", url: "/asset/inventory", icon: Package },
         { name: "Assign Assets", url: "/asset/assign", icon: ClipboardList },
         { name: "Disposal", url: "/asset/disposal", icon: Trash2 },
-        { name: "License", url: "/asset/license", icon: KeyRound },
+        { name: "Subscriptions", url: "/asset/license", icon: KeyRound },
         { name: "Warranty", url: "/asset/warranty", icon: ShieldCheck },
       ],
     },

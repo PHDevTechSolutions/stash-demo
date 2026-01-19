@@ -86,7 +86,7 @@ function DashboardContent() {
                         <Breadcrumb>
                             <BreadcrumbList>
                                 <BreadcrumbItem>
-                                    <BreadcrumbPage className="line-clamp-1">License</BreadcrumbPage>
+                                    <BreadcrumbPage className="line-clamp-1">Subscriptions and License</BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
                         </Breadcrumb>

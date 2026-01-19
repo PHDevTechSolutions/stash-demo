@@ -122,6 +122,12 @@ export const ReceivedDialog: React.FC<TicketDialogProps> = ({
                 } as React.ChangeEvent<HTMLInputElement>);
             }
 
+            if (!form.requestor_name) {
+                handleInputChange({
+                    target: { name: "requestor_name", value: fullname },
+                } as React.ChangeEvent<HTMLInputElement>);
+            }
+
             if (!form.closed_by) {
                 handleInputChange({
                     target: { name: "closed_by", value: fullname },

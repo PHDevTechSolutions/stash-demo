@@ -34,6 +34,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
+import {
+    Select,
+    SelectTrigger,
+    SelectValue,
+    SelectContent,
+    SelectItem,
+} from "@/components/ui/select";
 import { supabase } from "@/utils/supabase";
 
 interface AssignItem {
@@ -250,8 +257,8 @@ export const Assign: React.FC<AssignProps> = ({
         return activities.filter((item) => {
             // 🚫 HUWAG IPAKITA KAPAG DISPOSE
             if (
-                item.status?.toLowerCase() === "dispose" || 
-                item.status?.toLowerCase() === "missing" || 
+                item.status?.toLowerCase() === "dispose" ||
+                item.status?.toLowerCase() === "missing" ||
                 item.status?.toLowerCase() === "deployed" ||
                 item.status?.toLowerCase() === "lend" ||
                 item.status?.toLowerCase() === "defective"
@@ -607,12 +614,34 @@ export const Assign: React.FC<AssignProps> = ({
                                     {/* Department */}
                                     <div>
                                         <label className="block text-xs font-medium mb-1">Department</label>
-                                        <Input
-                                            placeholder="Enter department"
-                                            className="text-xs"
+                                        <Select
                                             value={department}
-                                            onChange={(e) => setDepartment(e.target.value)}
-                                        />
+                                            onValueChange={(value) => setDepartment(value)}
+                                        >
+                                            <SelectTrigger className="text-xs w-full" aria-label="Select department">
+                                                <SelectValue placeholder="Select department" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {[
+                                                    "Information Technology",
+                                                    "Human Resources",
+                                                    "Marketing",
+                                                    "Sales",
+                                                    "Accounting",
+                                                    "Procurement",
+                                                    "Admin",
+                                                    "Warehouse Operations",
+                                                    "Engineering",
+                                                    "Customer Service",
+                                                    "Ecommerce",
+                                                    "Product Development",
+                                                ].map((dept) => (
+                                                    <SelectItem key={dept} value={dept}>
+                                                        {dept}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                 </div>
                                 <div>

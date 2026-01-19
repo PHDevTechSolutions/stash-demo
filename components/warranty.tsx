@@ -316,7 +316,7 @@ export const Warranty: React.FC<WarrantyProps> = ({
                         onClick={exportToCSV}
                         className="text-xs px-3 py-2 border rounded-md hover:bg-muted"
                     >
-                        Export CSV
+                        Download CSV
                     </button>
                 </div>
             </CardHeader>

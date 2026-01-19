@@ -12,7 +12,6 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectTrigger,
@@ -39,9 +38,6 @@ interface InventoryFilterDialogProps {
   open: boolean;
   setOpen: (open: boolean) => void;
   filters: InventoryFilters;
-  handleFilterChange: (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => void;
   resetFilters: () => void;
   applyFilters: () => void;
   setFilters: React.Dispatch<React.SetStateAction<InventoryFilters>>;
@@ -52,17 +48,12 @@ const filterFields: { label: string; name: FilterKeys }[] = [
   { label: "Location", name: "location" },
   { label: "Asset Type", name: "asset_type" },
   { label: "Department", name: "department" },
-  { label: "Brand", name: "brand" },
-  { label: "Model", name: "model" },
-  { label: "Processor", name: "processor" },
-  { label: "Storage", name: "storage" },
 ];
 
 export function InventoryFilterDialog({
   open,
   setOpen,
   filters,
-  handleFilterChange,
   resetFilters,
   applyFilters,
   setFilters,
@@ -86,11 +77,9 @@ export function InventoryFilterDialog({
         </SheetHeader>
 
         <div className="space-y-4 mt-4">
-          {/* 🔢 PAGE LENGTH */}
+          {/* PAGE LENGTH */}
           <div className="flex flex-col">
-            <label className="text-xs font-medium mb-1">
-              Page Length
-            </label>
+            <label className="text-xs font-medium mb-1">Page Length</label>
             <Select
               value={filters.pageSize || "25"}
               onValueChange={(value) =>
@@ -113,23 +102,77 @@ export function InventoryFilterDialog({
             </Select>
           </div>
 
-          {/* 🔍 TEXT FILTERS */}
-          {filterFields.map(({ label, name }) => (
-            <div key={name} className="flex flex-col">
-              <label htmlFor={name} className="text-xs font-medium mb-1">
-                {label}
-              </label>
-              <Input
-                id={name}
-                name={name}
-                value={filters[name] || ""}
-                onChange={handleFilterChange}
-                placeholder={`Filter by ${label.toLowerCase()}`}
-                type="text"
-                className="text-sm"
-              />
-            </div>
-          ))}
+          {/* SELECT FILTERS */}
+          {filterFields.map(({ label, name }) => {
+            // Options with a sentinel "none" instead of empty string
+            const options: string[] = (() => {
+              switch (name) {
+                case "status":
+                  return [
+                    "none",
+                    "Spare",
+                    "Deployed",
+                    "Lend",
+                    "Missing",
+                    "Defective",
+                    "Dispose",
+                  ];
+                case "location":
+                  return ["none", "J&L", "Primex", "Pasig WH", "CDO", "Cebu", "Davao", "Buildchem", "Disruptive"];
+                case "asset_type":
+                  return ["none", "Laptop", "Desktop", "Monitor"];
+                case "department":
+                  return ["none", "Information Technology", "Human Resources", "Marketing", "Sales", "Accounting", "Procurement", "Admin", "Warehouse Operations", "Engineering", "Customer Service", "Ecommerce", "Product Development"];
+                case "brand":
+                  return ["none", "Dell", "HP", "Apple", "Lenovo"];
+                case "model":
+                  return ["none", "Model A", "Model B", "Model C"];
+                case "processor":
+                  return [
+                    "none",
+                    "Intel i5",
+                    "Intel i7",
+                    "AMD Ryzen 5",
+                    "AMD Ryzen 7",
+                  ];
+                case "storage":
+                  return ["none", "128GB", "256GB", "512GB", "1TB"];
+                default:
+                  return ["none"];
+              }
+            })();
+
+            // Map filter value: internal "" <-> select "none"
+            const currentValue = filters[name] === "" ? "none" : filters[name];
+
+            return (
+              <div key={name} className="flex flex-col">
+                <label htmlFor={name} className="text-xs font-medium mb-1">
+                  {label}
+                </label>
+                <Select
+                  value={currentValue}
+                  onValueChange={(value) =>
+                    setFilters((prev) => ({
+                      ...prev,
+                      [name]: value === "none" ? "" : value,
+                    }))
+                  }
+                >
+                  <SelectTrigger id={name} className="text-sm w-full">
+                    <SelectValue placeholder={`Select ${label.toLowerCase()}`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {options.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option === "none" ? "None" : option}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            );
+          })}
         </div>
 
         <SheetFooter className="flex justify-between mt-4">
