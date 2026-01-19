@@ -97,7 +97,7 @@ export function StatusCard({ counts, userId }: StatusCardProps) {
 
         <CardFooter className="flex justify-end">
           <Button variant="outline" asChild>
-            <a href={`/asset/inventory?id=${encodeURIComponent(userId ?? "")}`}>
+            <a href={`/asset/all?id=${encodeURIComponent(userId ?? "")}`}>
               View All
             </a>
           </Button>

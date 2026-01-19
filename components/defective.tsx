@@ -72,12 +72,12 @@ interface TicketProps {
 }
 
 const statusColors: Record<string, string> = {
-    Spare: "bg-green-100 text-green-800",
-    Deploy: "bg-blue-100 text-blue-800",
-    Lend: "bg-purple-100 text-purple-800",
-    Missing: "bg-yellow-100 text-yellow-800",
-    Defective: "bg-red-100 text-red-800",
-    Dispose: "bg-gray-200 text-gray-800",
+    SPARE: "bg-green-100 text-green-800",
+    DEPLOYED: "bg-blue-100 text-blue-800",
+    LEND: "bg-purple-100 text-purple-800",
+    MISSING: "bg-yellow-100 text-yellow-800",
+    DEFECTIVE: "bg-red-100 text-red-800",
+    DISPOSE: "bg-gray-200 text-gray-800",
 };
 
 const PAGE_SIZE = 10;

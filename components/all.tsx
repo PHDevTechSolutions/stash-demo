@@ -82,7 +82,7 @@ const statusColors: Record<string, string> = {
 
 const PAGE_SIZE = 10;
 
-export const Missing: React.FC<TicketProps> = ({
+export const All: React.FC<TicketProps> = ({
     referenceid,
     dateCreatedFilterRange,
 }) => {
@@ -221,9 +221,6 @@ export const Missing: React.FC<TicketProps> = ({
 
         // Filter first
         const filtered = activities.filter((item) => {
-            // EXCLUDE items with status "Dispose"
-            if (item.status !== "MISSING") return false;
-
             const matchesSearch =
                 search.trim() === "" ||
                 Object.values(item).some((val) =>
@@ -383,7 +380,7 @@ export const Missing: React.FC<TicketProps> = ({
                     {/* RIGHT */}
                     <div className="flex flex-wrap items-center gap-2">
                         {/* TOTAL SPARE BADGE */}
-                        <Badge className="bg-red-800 text-white py-2 px-4 text-sm">
+                        <Badge className="bg-green-600 text-white py-2 px-4 text-sm">
                             Total: {totalSpareCount}
                         </Badge>
 
