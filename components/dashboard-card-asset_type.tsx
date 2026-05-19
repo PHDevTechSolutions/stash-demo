@@ -2,129 +2,121 @@
 
 import React, { useMemo } from "react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-  type ChartConfig,
-} from "@/components/ui/chart";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  LabelList,
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    LabelList,
+    ResponsiveContainer,
+    Tooltip,
 } from "recharts";
-import { TrendingUp } from "lucide-react";
 
 interface AssetCardProps {
-  chartData: { month: string; desktop: number }[];
-  title: string;
-  description: string;
+    chartData: { month: string; desktop: number }[];
+    title: string;
+    description: string;
+}
+
+function CustomTooltip({ active, payload, label }: any) {
+    if (!active || !payload?.length) return null;
+    return (
+        <div
+            className="px-3 py-2 border font-mono text-[10px]"
+            style={{ backgroundColor: "#0d1117", borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
+        >
+            <div style={{ color: "rgba(255,255,255,0.4)" }}>{label}</div>
+            <div style={{ color: "#38bdf8" }}>{payload[0].value} assets</div>
+        </div>
+    );
 }
 
 export function AssetCard({ chartData, title, description }: AssetCardProps) {
-  /**
-   * 🔹 Normalize data
-   * MONITOR / Monitor / monitor → Monitor
-   */
-  const normalizedData = useMemo(() => {
-    const map = new Map<string, number>();
+    const normalizedData = useMemo(() => {
+        const map = new Map<string, number>();
+        chartData.forEach(({ month, desktop }) => {
+            const key =
+                month.trim().toLowerCase().charAt(0).toUpperCase() +
+                month.trim().toLowerCase().slice(1);
+            map.set(key, (map.get(key) ?? 0) + desktop);
+        });
+        return Array.from(map.entries())
+            .map(([month, desktop]) => ({ month, desktop }))
+            .sort((a, b) => b.desktop - a.desktop);
+    }, [chartData]);
 
-    chartData.forEach(({ month, desktop }) => {
-      const normalizedKey =
-        month.trim().toLowerCase().charAt(0).toUpperCase() +
-        month.trim().toLowerCase().slice(1);
+    const yAxisWidth = Math.min(Math.max(...normalizedData.map((d) => d.month.length * 7), 80), 160);
 
-      map.set(normalizedKey, (map.get(normalizedKey) ?? 0) + desktop);
-    });
-
-    return Array.from(map.entries()).map(([month, desktop]) => ({
-      month,
-      desktop,
-    }));
-  }, [chartData]);
-
-  /**
-   * 🔹 Dynamic YAxis width
-   * para hindi matabunan ang labels
-   */
-  const yAxisWidth = Math.min(
-    Math.max(
-      ...normalizedData.map((d) => d.month.length * 8),
-      80
-    ),
-    180
-  );
-
-  const chartConfig = {
-    desktop: {
-      label: "Assets",
-      color: "var(--chart-1)",
-    },
-  } satisfies ChartConfig;
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        <CardDescription>{description}</CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        <ChartContainer config={chartConfig}>
-          <BarChart
-            accessibilityLayer
-            data={normalizedData}
-            layout="vertical"
-            barSize={22}
-            margin={{ left: 16, right: 16 }}
-          >
-            <CartesianGrid horizontal={false} />
-            <XAxis type="number" hide />
-            <YAxis
-              type="category"
-              dataKey="month"
-              width={yAxisWidth}
-              tickLine={false}
-              axisLine={false}
-            />
-
-            <ChartTooltip
-              cursor={false}
-              content={<ChartTooltipContent />}
-            />
-
-            <Bar
-              dataKey="desktop"
-              fill="var(--color-desktop)"
-              radius={[6, 6, 6, 6]}
+    return (
+        <div
+            className="border flex flex-col"
+            style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}
+        >
+            {/* Header */}
+            <div
+                className="px-4 py-3 border-b"
+                style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}
             >
-              {/* Value label sa dulo ng bar */}
-              <LabelList
-                dataKey="desktop"
-                position="right"
-                className="fill-foreground text-xs"
-              />
-            </Bar>
-          </BarChart>
-        </ChartContainer>
-      </CardContent>
+                <div className="flex items-center gap-2 mb-0.5">
+                    <span
+                        className="inline-flex w-1.5 h-1.5 rounded-full"
+                        style={{ backgroundColor: "#38bdf8", boxShadow: "0 0 5px #38bdf8" }}
+                    />
+                    <span className="text-[10px] uppercase tracking-widest font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
+                        {title}
+                    </span>
+                </div>
+                <p className="text-[9px] pl-3.5" style={{ color: "rgba(255,255,255,0.2)" }}>{description}</p>
+            </div>
 
-      <CardFooter className="flex-col items-start gap-2 text-sm">
-        <div className="flex gap-2 leading-none font-medium">
-          Showing total assets grouped by type
-          <TrendingUp className="h-4 w-4" />
+            {/* Chart */}
+            <div className="p-4 flex-1">
+                {normalizedData.length === 0 ? (
+                    <div className="flex items-center justify-center py-10">
+                        <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                            NO DATA
+                        </span>
+                    </div>
+                ) : (
+                    <ResponsiveContainer width="100%" height={Math.max(normalizedData.length * 36, 120)}>
+                        <BarChart
+                            data={normalizedData}
+                            layout="vertical"
+                            barSize={16}
+                            margin={{ left: 0, right: 40, top: 4, bottom: 4 }}
+                        >
+                            <CartesianGrid horizontal={false} stroke="rgba(255,255,255,0.04)" />
+                            <XAxis type="number" hide />
+                            <YAxis
+                                type="category"
+                                dataKey="month"
+                                width={yAxisWidth}
+                                tickLine={false}
+                                axisLine={false}
+                                tick={{ fill: "rgba(255,255,255,0.4)", fontSize: 10, fontFamily: "monospace" }}
+                            />
+                            <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
+                            <Bar dataKey="desktop" fill="#38bdf8" radius={[0, 3, 3, 0]} opacity={0.8}>
+                                <LabelList
+                                    dataKey="desktop"
+                                    position="right"
+                                    style={{ fill: "rgba(255,255,255,0.4)", fontSize: 10, fontFamily: "monospace" }}
+                                />
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                )}
+            </div>
+
+            {/* Footer */}
+            <div
+                className="px-4 py-2 border-t"
+                style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.2)" }}
+            >
+                <span className="text-[9px] uppercase tracking-widest font-mono" style={{ color: "rgba(255,255,255,0.2)" }}>
+                    {normalizedData.length} TYPE{normalizedData.length !== 1 ? "S" : ""} · {normalizedData.reduce((s, d) => s + d.desktop, 0)} TOTAL
+                </span>
+            </div>
         </div>
-      </CardFooter>
-    </Card>
-  );
+    );
 }

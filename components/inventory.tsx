@@ -2,30 +2,31 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircleIcon, CheckCircle2Icon, DownloadCloud, Trash2Icon, Printer, Plus, UploadCloud, ArchiveIcon, Filter } from "lucide-react";
+import {
+    AlertCircleIcon, CheckCircle2Icon, DownloadCloud, Trash2Icon,
+    Printer, Plus, UploadCloud, ArchiveIcon, Filter,
+    Activity, Database, Cpu, HardDrive, Monitor,
+} from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
-import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, } from "@/components/ui/dialog";
+import {
+    Dialog, DialogContent, DialogHeader, DialogTitle,
+    DialogDescription, DialogFooter,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Table, TableBody, TableHead, TableHeader, TableRow, TableCell, } from "@/components/ui/table";
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious, } from "@/components/ui/pagination";
-import { Badge } from "@/components/ui/badge";
+import {
+    Pagination, PaginationContent, PaginationItem,
+    PaginationNext, PaginationPrevious,
+} from "@/components/ui/pagination";
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import {
-    Sheet,
-    SheetContent,
-    SheetDescription,
-    SheetHeader,
-    SheetTitle,
-    SheetTrigger,
+    Sheet, SheetContent, SheetDescription,
+    SheetHeader, SheetTitle,
 } from "@/components/ui/sheet";
 import {
-    Accordion,
-    AccordionContent,
-    AccordionItem,
-    AccordionTrigger,
+    Accordion, AccordionContent,
+    AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
 import { InventoryDialog } from "@/components/inventory-dialog";
 import { InventoryFilterDialog } from "@/components/inventory-filter-dialog";
@@ -33,158 +34,139 @@ import { supabase } from "@/utils/supabase";
 import { type InventoryItem } from "@/types/inventory";
 import { generateBulkAccountabilityPDF, groupSelectedItems } from "@/utils/generate-bulk-accountability-pdf";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 type InventoryFilters = {
-    status: string;
-    location: string;
-    asset_type: string;
-    department: string;
-    brand: string;
-    model: string;
-    processor: string;
-    storage: string;
-    pageSize: string;
+    status: string; location: string; asset_type: string; department: string;
+    brand: string; model: string; processor: string; storage: string; pageSize: string;
 };
 
 interface TicketProps {
     referenceid: string;
     dateCreatedFilterRange: DateRange | undefined;
-    setDateCreatedFilterRangeAction: React.Dispatch<
-        React.SetStateAction<DateRange | undefined>
-    >;
+    setDateCreatedFilterRangeAction: React.Dispatch<React.SetStateAction<DateRange | undefined>>;
 }
 
-const statusColors: Record<string, string> = {
-    SPARE: "bg-green-100 text-green-800",
-    DEPLOYED: "bg-blue-100 text-blue-800",
-    LEND: "bg-purple-100 text-purple-800",
-    MISSING: "bg-yellow-100 text-yellow-800",
-    DEFECTIVE: "bg-red-100 text-red-800",
-    DISPOSE: "bg-gray-200 text-gray-800",
+// ─── Status config ────────────────────────────────────────────────────────────
+
+const STATUS_CONFIG: Record<string, { dot: string; text: string; bg: string; border: string }> = {
+    SPARE:     { dot: "#22c55e", text: "#86efac", bg: "rgba(34,197,94,0.08)",  border: "rgba(34,197,94,0.25)"  },
+    DEPLOYED:  { dot: "#38bdf8", text: "#7dd3fc", bg: "rgba(56,189,248,0.08)", border: "rgba(56,189,248,0.25)" },
+    LEND:      { dot: "#a78bfa", text: "#c4b5fd", bg: "rgba(167,139,250,0.08)",border: "rgba(167,139,250,0.25)"},
+    MISSING:   { dot: "#fbbf24", text: "#fcd34d", bg: "rgba(251,191,36,0.08)", border: "rgba(251,191,36,0.25)" },
+    DEFECTIVE: { dot: "#f87171", text: "#fca5a5", bg: "rgba(248,113,113,0.08)",border: "rgba(248,113,113,0.25)"},
+    DISPOSE:   { dot: "#6b7280", text: "#9ca3af", bg: "rgba(107,114,128,0.08)",border: "rgba(107,114,128,0.25)"},
 };
 
-export const Inventory: React.FC<TicketProps> = ({
-    referenceid,
-    dateCreatedFilterRange,
-}) => {
-    const [activities, setActivities] = useState<InventoryItem[]>([]);
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function TerminalDot({ color }: { color: string }) {
+    return (
+        <span className="inline-flex items-center justify-center w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }} />
+    );
+}
+
+function StatCard({ icon: Icon, label, value, accent }: { icon: React.ElementType; label: string; value: string | number; accent: string }) {
+    return (
+        <div className="relative border p-4 font-mono overflow-hidden"
+            style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.02)" }}>
+            <div className="absolute top-0 left-0 w-0.5 h-full" style={{ backgroundColor: accent }} />
+            <div className="flex items-center justify-between mb-2">
+                <span className="text-[9px] uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,0.35)" }}>{label}</span>
+                <Icon className="h-3.5 w-3.5 opacity-30" style={{ color: accent }} />
+            </div>
+            <div className="text-2xl font-bold tabular-nums" style={{ color: accent }}>{value}</div>
+        </div>
+    );
+}
+
+function StatusBadge({ status }: { status: string }) {
+    const cfg = STATUS_CONFIG[status?.toUpperCase()] ?? STATUS_CONFIG.DISPOSE;
+    return (
+        <span className="inline-flex items-center gap-1.5 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest border font-mono"
+            style={{ color: cfg.text, backgroundColor: cfg.bg, borderColor: cfg.border }}>
+            <TerminalDot color={cfg.dot} />
+            {status}
+        </span>
+    );
+}
+
+function THead({ children }: { children: React.ReactNode }) {
+    return (
+        <th className="px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.15em] whitespace-nowrap select-none"
+            style={{ color: "rgba(255,255,255,0.3)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            {children}
+        </th>
+    );
+}
+
+function TCell({ children, mono = false }: { children: React.ReactNode; mono?: boolean }) {
+    return (
+        <td className={`px-3 py-2.5 text-[11px] ${mono ? "font-mono" : ""} whitespace-nowrap`}
+            style={{ color: "rgba(255,255,255,0.65)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+            {children || <span style={{ color: "rgba(255,255,255,0.18)" }}>—</span>}
+        </td>
+    );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilterRange }) => {
+    const [activities,        setActivities]        = useState<InventoryItem[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(false);
-    const [errorActivities, setErrorActivities] = useState<string | null>(null);
-
-    const [page, setPage] = useState(1);
+    const [errorActivities,   setErrorActivities]   = useState<string | null>(null);
+    const [page,   setPage]   = useState(1);
     const [search, setSearch] = useState("");
-
-    const [open, setOpen] = useState(false);
+    const [open,      setOpen]      = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    const [form, setForm] = useState<
-        Omit<InventoryItem, "id" | "date_created" | "referenceid">
-    >({
-        asset_tag: "",
-        asset_type: "",
-        status: "",
-        location: "",
-        new_user: "",
-        old_user: "",
-        department: "",
-        position: "",
-        brand: "",
-        model: "",
-        processor: "",
-        ram: "",
-        storage: "",
-        serial_number: "",
-        purchase_date: "",
-        warranty_date: "",
-        asset_age: "",
-        amount: "",
-        remarks: "",
-        mac_address: "",
+    const [form, setForm] = useState<Omit<InventoryItem, "id" | "date_created" | "referenceid">>({
+        asset_tag: "", asset_type: "", status: "", location: "", new_user: "", old_user: "",
+        department: "", position: "", brand: "", model: "", processor: "", ram: "",
+        storage: "", serial_number: "", purchase_date: "", warranty_date: "", asset_age: "",
+        amount: "", remarks: "", mac_address: "",
     });
 
-    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-
+    const [selectedIds,       setSelectedIds]       = useState<Set<string>>(new Set());
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
-    const [isPdfGenerating, setIsPdfGenerating] = useState(false);
-    const [printCompany, setPrintCompany] = useState<"ecoshift" | "disruptive">("ecoshift");
+    const [filterSheetOpen,   setFilterSheetOpen]   = useState(false);
+    const [isPdfGenerating,   setIsPdfGenerating]   = useState(false);
+    const [printCompany,      setPrintCompany]      = useState<"ecoshift" | "disruptive">("ecoshift");
 
     const [filters, setFilters] = useState<InventoryFilters>({
-        status: "",
-        location: "",
-        asset_type: "",
-        department: "",
-        brand: "",
-        model: "",
-        processor: "",
-        storage: "",
-        pageSize: "25",
+        status: "", location: "", asset_type: "", department: "",
+        brand: "", model: "", processor: "", storage: "", pageSize: "25",
     });
 
-    const [hasOldItems, setHasOldItems] = useState(false);
-    const [oldItems, setOldItems] = useState<InventoryItem[]>([]);
+    const [hasOldItems,      setHasOldItems]      = useState(false);
+    const [oldItems,         setOldItems]         = useState<InventoryItem[]>([]);
     const [updatingOldItems, setUpdatingOldItems] = useState(false);
-
-    const [bulkOpen, setBulkOpen] = useState(false);
-    const [bulkFile, setBulkFile] = useState<File | null>(null);
-    const [bulkReferenceId, setBulkReferenceId] = useState(referenceid);
-
-    const pageSize = useMemo(() => {
-        const size = Number(filters.pageSize);
-        return Number.isFinite(size) && size > 0 ? size : 25;
-    }, [filters.pageSize]);
-
-
-    useEffect(() => {
-        setBulkReferenceId(referenceid);
-    }, [referenceid]);
-
-    const [uploadingBulk, setUploadingBulk] = useState(false);
-    const [disposeSheetOpen, setDisposeSheetOpen] = useState(false);
+    const [bulkOpen,         setBulkOpen]         = useState(false);
+    const [bulkFile,         setBulkFile]         = useState<File | null>(null);
+    const [bulkReferenceId,  setBulkReferenceId]  = useState(referenceid);
+    const [uploadingBulk,    setUploadingBulk]    = useState(false);
+    const [disposeSheetOpen,   setDisposeSheetOpen]   = useState(false);
     const [selectedDisposeIds, setSelectedDisposeIds] = useState<Set<string>>(new Set());
 
-    function handleSelectChange(name: string, value: string) {
-        setForm((prev) => ({
-            ...prev,
-            [name]: value,
-        }));
-    }
+    const pageSize = useMemo(() => { const s = Number(filters.pageSize); return Number.isFinite(s) && s > 0 ? s : 25; }, [filters.pageSize]);
 
-    function handleSetAssetTag(value: string) {
-        setForm((prev) => ({ ...prev, asset_tag: value }));
-    }
+    useEffect(() => { setBulkReferenceId(referenceid); }, [referenceid]);
+
+    function handleSelectChange(name: string, value: string) { setForm((p) => ({ ...p, [name]: value })); }
+    function handleSetAssetTag(value: string) { setForm((p) => ({ ...p, asset_tag: value })); }
 
     const fetchActivities = useCallback(() => {
-        if (!referenceid) {
-            setActivities([]);
-            setHasOldItems(false);
-            setOldItems([]);
-            return;
-        }
-        setLoadingActivities(true);
-        setErrorActivities(null);
-
+        if (!referenceid) { setActivities([]); setHasOldItems(false); setOldItems([]); return; }
+        setLoadingActivities(true); setErrorActivities(null);
         fetch(`/api/fetch-inventory?referenceid=${encodeURIComponent(referenceid)}`)
-            .then(async (res) => {
-                if (!res.ok) throw new Error("Failed to fetch activities");
-                return res.json();
-            })
+            .then(async (res) => { if (!res.ok) throw new Error("Failed to fetch activities"); return res.json(); })
             .then((data) => {
                 const items: InventoryItem[] = data.data || [];
                 setActivities(items);
-
-                // NEW: Detect old items 5 years+ and not disposed
-                const fiveYearsAgo = new Date();
-                fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-
-                const oldOnes = items.filter(item => {
-                    if (!item.purchase_date) return false;
-                    const purchaseDate = new Date(item.purchase_date);
-                    if (isNaN(purchaseDate.getTime())) return false;
-                    return purchaseDate < fiveYearsAgo && item.status !== "DISPOSE";
-                });
-
-                setOldItems(oldOnes);
-                setHasOldItems(oldOnes.length > 0);
+                const fiveYearsAgo = new Date(); fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+                const oldOnes = items.filter(item => { if (!item.purchase_date) return false; const d = new Date(item.purchase_date); return !isNaN(d.getTime()) && d < fiveYearsAgo && item.status !== "DISPOSE"; });
+                setOldItems(oldOnes); setHasOldItems(oldOnes.length > 0);
             })
             .catch((err) => setErrorActivities(err.message))
             .finally(() => setLoadingActivities(false));
@@ -192,960 +174,476 @@ export const Inventory: React.FC<TicketProps> = ({
 
     useEffect(() => {
         fetchActivities();
-
         if (!referenceid) return;
-
-        const channel = supabase
-            .channel(`public:inventory:referenceid=eq.${referenceid}`)
-            .on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "inventory",
-                    filter: `referenceid=eq.${referenceid}`,
-                },
-                (payload) => {
-                    const newRecord = payload.new as InventoryItem;
-                    const oldRecord = payload.old as InventoryItem;
-
-                    setActivities((curr) => {
-                        switch (payload.eventType) {
-                            case "INSERT":
-                                if (!curr.some((a) => a.id === newRecord.id)) {
-                                    return [...curr, newRecord];
-                                }
-                                return curr;
-                            case "UPDATE":
-                                return curr.map((a) => (a.id === newRecord.id ? newRecord : a));
-                            case "DELETE":
-                                return curr.filter((a) => a.id !== oldRecord.id);
-                            default:
-                                return curr;
-                        }
-                    });
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        const channel = supabase.channel(`public:inventory:referenceid=eq.${referenceid}`)
+            .on("postgres_changes", { event: "*", schema: "public", table: "inventory", filter: `referenceid=eq.${referenceid}` }, (payload) => {
+                const n = payload.new as InventoryItem; const o = payload.old as InventoryItem;
+                setActivities((curr) => {
+                    switch (payload.eventType) {
+                        case "INSERT": return curr.some((a) => a.id === n.id) ? curr : [...curr, n];
+                        case "UPDATE": return curr.map((a) => (a.id === n.id ? n : a));
+                        case "DELETE": return curr.filter((a) => a.id !== o.id);
+                        default: return curr;
+                    }
+                });
+            }).subscribe();
+        return () => { supabase.removeChannel(channel); };
     }, [referenceid, fetchActivities]);
 
-    function handleFilterChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const { name, value } = e.target;
-        setFilters((prev) => ({ ...prev, [name]: value }));
-    }
-
-    function resetFilters() {
-        setFilters({
-            status: "",
-            location: "",
-            asset_type: "",
-            department: "",
-            brand: "",
-            model: "",
-            processor: "",
-            storage: "",
-            pageSize: "25", // 👈 default
-        });
-        setPage(1);
-    }
-
-    function applyFilters() {
-        setPage(1);
-        setFilterSheetOpen(false);
-    }
+    function resetFilters() { setFilters({ status: "", location: "", asset_type: "", department: "", brand: "", model: "", processor: "", storage: "", pageSize: "25" }); setPage(1); }
+    function applyFilters() { setPage(1); setFilterSheetOpen(false); }
 
     const filteredActivities = useMemo(() => {
         if (!activities.length) return [];
-
-        let startDate: Date | null = null;
-        let endDate: Date | null = null;
-
-        if (dateCreatedFilterRange?.from) {
-            startDate = new Date(dateCreatedFilterRange.from);
-            startDate.setHours(0, 0, 0, 0);
-        }
-
-        if (dateCreatedFilterRange?.to) {
-            endDate = new Date(dateCreatedFilterRange.to);
-            endDate.setHours(23, 59, 59, 999);
-        }
-
-        // Filter first
+        let startDate: Date | null = null, endDate: Date | null = null;
+        if (dateCreatedFilterRange?.from) { startDate = new Date(dateCreatedFilterRange.from); startDate.setHours(0,0,0,0); }
+        if (dateCreatedFilterRange?.to)   { endDate   = new Date(dateCreatedFilterRange.to);   endDate.setHours(23,59,59,999); }
         const filtered = activities.filter((item) => {
-            // EXCLUDE items with status "Dispose"
             if (item.status === "Dispose") return false;
-
-            const matchesSearch =
-                search.trim() === "" ||
-                Object.values(item).some((val) =>
-                    val?.toString().toLowerCase().includes(search.toLowerCase())
-                );
-
-            if (!matchesSearch) return false;
-
-            const matchesFilters = Object.entries(filters).every(([key, filterValue]) => {
-                if (!filterValue) return true;
-                if (key === "pageSize") return true; // 👈 IMPORTANT
-
-                const itemValue = item[key as keyof InventoryItem];
-                return (
-                    itemValue
-                        ?.toString()
-                        .toLowerCase()
-                        .includes(filterValue.toLowerCase()) ?? false
-                );
-            });
-
-            if (!matchesFilters) return false;
-
-            if (startDate || endDate) {
-                if (!item.purchase_date) return false;
-
-                const itemDate = new Date(item.purchase_date);
-                if (isNaN(itemDate.getTime())) return false;
-
-                if (startDate && itemDate < startDate) return false;
-                if (endDate && itemDate > endDate) return false;
-            }
-
+            if (search.trim() && !Object.values(item).some(v => v?.toString().toLowerCase().includes(search.toLowerCase()))) return false;
+            if (!Object.entries(filters).every(([key, fv]) => { if (!fv || key === "pageSize") return true; const iv = item[key as keyof InventoryItem]; return iv?.toString().toLowerCase().includes(fv.toLowerCase()) ?? false; })) return false;
+            if (startDate || endDate) { if (!item.purchase_date) return false; const d = new Date(item.purchase_date); if (isNaN(d.getTime())) return false; if (startDate && d < startDate) return false; if (endDate && d > endDate) return false; }
             return true;
         });
-
-        // Sort descending by asset_tag
-        filtered.sort((a, b) => {
-            if (!a.asset_tag) return 1;   // Push undefined asset_tag to the end
-            if (!b.asset_tag) return -1;
-            return b.asset_tag.localeCompare(a.asset_tag);
-        });
-
+        filtered.sort((a, b) => { if (!a.asset_tag) return 1; if (!b.asset_tag) return -1; return b.asset_tag.localeCompare(a.asset_tag); });
         return filtered;
     }, [activities, search, filters, dateCreatedFilterRange]);
 
-    const totalSpareCount = useMemo(() => {
-        return filteredActivities.length;
-    }, [filteredActivities]);
-
-    const showPrintButton = selectedIds.size > 0 && [...selectedIds].some(id => {
-        const item = activities.find(a => a.id === id);
-        return !!item?.new_user?.trim();
-    });
+    const stats = useMemo(() => ({
+        total:    filteredActivities.length,
+        deployed: filteredActivities.filter(i => i.status?.toUpperCase() === "DEPLOYED").length,
+        spare:    filteredActivities.filter(i => i.status?.toUpperCase() === "SPARE").length,
+        defect:   filteredActivities.filter(i => ["DEFECTIVE","MISSING"].includes(i.status?.toUpperCase())).length,
+    }), [filteredActivities]);
 
     const pageCount = Math.ceil(filteredActivities.length / pageSize);
+    const paginatedActivities = useMemo(() => { const s = (page - 1) * pageSize; return filteredActivities.slice(s, s + pageSize); }, [filteredActivities, page, pageSize]);
 
-    const paginatedActivities = useMemo(() => {
-        const start = (page - 1) * pageSize;
-        return filteredActivities.slice(start, start + pageSize);
-    }, [filteredActivities, page, pageSize]);
+    const showPrintButton = selectedIds.size > 0 && [...selectedIds].some(id => { const item = activities.find(a => a.id === id); return !!item?.new_user?.trim(); });
 
-    function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const { name, value } = e.target;
-        setForm((prev) => ({ ...prev, [name]: value }));
-    }
+    function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) { const { name, value } = e.target; setForm((p) => ({ ...p, [name]: value })); }
 
     async function handleSubmit() {
-        if (!form.status) {
-            alert("Status is required");
-            return;
-        }
-
+        if (!form.status) { alert("Status is required"); return; }
         try {
-            const res = await fetch("/api/create-inventory", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, referenceid }),
-            });
-
-            if (!res.ok) {
-                const json = await res.json();
-                throw new Error(json.error || "Failed to create inventory");
-            }
-
-            toast.success("Inventory created successfully!");
-            fetchActivities();
-            setOpen(false);
-            resetForm();
-        } catch (error: any) {
-            toast.error(error.message || "Error creating inventory");
-        }
+            const res = await fetch("/api/create-inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, referenceid }) });
+            if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed to create inventory"); }
+            toast.success("Record created."); fetchActivities(); setOpen(false); resetForm();
+        } catch (e: any) { toast.error(e.message); }
     }
 
     async function handleUpdate() {
-        if (!form.status) {
-            alert("Status is required");
-            return;
-        }
-        if (!editingId) {
-            alert("No item selected for update");
-            return;
-        }
-
+        if (!form.status || !editingId) { alert("Status is required"); return; }
         try {
-            const res = await fetch(`/api/update-inventory?id=${encodeURIComponent(editingId)}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, referenceid }),
-            });
-
-            if (!res.ok) {
-                const json = await res.json();
-                throw new Error(json.error || "Failed to update inventory");
-            }
-
-            toast.success("Inventory updated successfully!");
-            fetchActivities();
-            setOpen(false);
-            resetForm();
-        } catch (error: any) {
-            toast.error(error.message || "Error updating inventory");
-        }
+            const res = await fetch(`/api/update-inventory?id=${encodeURIComponent(editingId)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, referenceid }) });
+            if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed to update inventory"); }
+            toast.success("Record updated."); fetchActivities(); setOpen(false); resetForm();
+        } catch (e: any) { toast.error(e.message); }
     }
 
     function resetForm() {
-        setForm({
-            asset_tag: "",
-            asset_type: "",
-            status: "",
-            location: "",
-            new_user: "",
-            old_user: "",
-            department: "",
-            position: "",
-            brand: "",
-            model: "",
-            processor: "",
-            ram: "",
-            storage: "",
-            serial_number: "",
-            purchase_date: "",
-            warranty_date: "",
-            asset_age: "",
-            amount: "",
-            remarks: "",
-            mac_address: "",
-        });
+        setForm({ asset_tag: "", asset_type: "", status: "", location: "", new_user: "", old_user: "", department: "", position: "", brand: "", model: "", processor: "", ram: "", storage: "", serial_number: "", purchase_date: "", warranty_date: "", asset_age: "", amount: "", remarks: "", mac_address: "" });
         setEditingId(null);
     }
 
     function openEditDialog(item: InventoryItem) {
         setEditingId(item.id);
-        setForm({
-            status: item.status,
-            location: item.location ?? "",
-            new_user: item.new_user ?? "",
-            old_user: item.old_user ?? "",
-            department: item.department ?? "",
-            position: item.position ?? "",
-            brand: item.brand ?? "",
-            model: item.model ?? "",
-            processor: item.processor ?? "",
-            ram: item.ram ?? "",
-            storage: item.storage ?? "",
-            serial_number: item.serial_number ?? "",
-            purchase_date: item.purchase_date ?? "",
-            warranty_date: item.warranty_date ?? "",
-            asset_age: item.asset_age ?? "",
-            amount: item.amount ?? "",
-            remarks: item.remarks ?? "",
-            mac_address: item.mac_address ?? "",
-        });
+        setForm({ status: item.status, location: item.location ?? "", new_user: item.new_user ?? "", old_user: item.old_user ?? "", department: item.department ?? "", position: item.position ?? "", brand: item.brand ?? "", model: item.model ?? "", processor: item.processor ?? "", ram: item.ram ?? "", storage: item.storage ?? "", serial_number: item.serial_number ?? "", purchase_date: item.purchase_date ?? "", warranty_date: item.warranty_date ?? "", asset_age: item.asset_age ?? "", amount: item.amount ?? "", remarks: item.remarks ?? "", mac_address: item.mac_address ?? "" });
         setOpen(true);
     }
 
-    function toggleSelect(id: string) {
-        setSelectedIds((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
-        });
-    }
+    function toggleSelect(id: string) { setSelectedIds((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }); }
+    function toggleSelectAll() { const all = paginatedActivities.every(i => selectedIds.has(i.id)); setSelectedIds((p) => { const s = new Set(p); all ? paginatedActivities.forEach(i => s.delete(i.id)) : paginatedActivities.forEach(i => s.add(i.id)); return s; }); }
 
-    function toggleSelectAll() {
-        const allSelected = paginatedActivities.every((item) => selectedIds.has(item.id));
-        if (allSelected) {
-            setSelectedIds((prev) => {
-                const newSet = new Set(prev);
-                paginatedActivities.forEach((item) => newSet.delete(item.id));
-                return newSet;
-            });
-        } else {
-            setSelectedIds((prev) => {
-                const newSet = new Set(prev);
-                paginatedActivities.forEach((item) => newSet.add(item.id));
-                return newSet;
-            });
-        }
-    }
-
-    async function handleDeleteSelected() {
-        if (selectedIds.size === 0) return;
-        setConfirmDeleteOpen(true);
+    async function handleDeleteSelected() { if (selectedIds.size === 0) return; setConfirmDeleteOpen(true); }
+    async function confirmDeletion() {
+        try {
+            const res = await fetch("/api/delete-inventory", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: Array.from(selectedIds) }) });
+            if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed to delete inventory items"); }
+            toast.success(`${selectedIds.size} record(s) deleted.`); setSelectedIds(new Set()); setConfirmDeleteOpen(false); fetchActivities();
+        } catch (e: any) { toast.error(e.message); setConfirmDeleteOpen(false); }
     }
 
     async function handlePrintBulk() {
-        // Guard: do nothing if nothing is selected
         if (selectedIds.size === 0) return;
-
-        // Collect the selected InventoryItem objects
         const selectedItems = activities.filter(a => selectedIds.has(a.id));
-
-        // Group by employee
         const groups = groupSelectedItems(selectedItems);
-
-        // If every group is "Unknown" there are no valid employees — show error and bail
-        if (groups.every(g => g.new_user === "Unknown")) {
-            toast.error("None of the selected items have a valid employee name.");
-            return;
-        }
-
+        if (groups.every(g => g.new_user === "Unknown")) { toast.error("None of the selected items have a valid employee name."); return; }
         setIsPdfGenerating(true);
-        try {
-            await generateBulkAccountabilityPDF(groups, printCompany);
-        } catch {
-            toast.error("Failed to generate PDF");
-        } finally {
-            setIsPdfGenerating(false);
-        }
+        try { await generateBulkAccountabilityPDF(groups, printCompany); }
+        catch { toast.error("Failed to generate PDF"); }
+        finally { setIsPdfGenerating(false); }
     }
 
-    async function confirmDeletion() {
-        try {
-            const res = await fetch("/api/delete-inventory", {
-                method: "DELETE",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: Array.from(selectedIds) }),
-            });
-
-            if (!res.ok) {
-                const json = await res.json();
-                throw new Error(json.error || "Failed to delete inventory items");
-            }
-
-            toast.success(`${selectedIds.size} item(s) deleted successfully.`);
-            setSelectedIds(new Set());
-            setConfirmDeleteOpen(false);
-            fetchActivities();
-        } catch (error: any) {
-            toast.error(error.message || "Error deleting inventory items");
-            setConfirmDeleteOpen(false);
-        }
-    }
-
-    function toggleDisposeSelect(id: string) {
-        setSelectedDisposeIds((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
-        });
-    }
-
-    function toggleDisposeSelectAll() {
-        if (selectedDisposeIds.size === oldItems.length) {
-            setSelectedDisposeIds(new Set());
-        } else {
-            setSelectedDisposeIds(new Set(oldItems.map((i) => i.id)));
-        }
-    }
+    function toggleDisposeSelect(id: string) { setSelectedDisposeIds((p) => { const s = new Set(p); s.has(id) ? s.delete(id) : s.add(id); return s; }); }
+    function toggleDisposeSelectAll() { setSelectedDisposeIds(selectedDisposeIds.size === oldItems.length ? new Set() : new Set(oldItems.map(i => i.id))); }
 
     async function confirmUpdateDispose() {
-        if (selectedDisposeIds.size === 0) {
-            toast.error("Please select at least one item to update.");
-            return;
-        }
-
+        if (selectedDisposeIds.size === 0) { toast.error("Select at least one item."); return; }
         setUpdatingOldItems(true);
-
         try {
-            const res = await fetch("/api/update-status-old-items", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ids: Array.from(selectedDisposeIds), newStatus: "Dispose" }),
-            });
-
-            if (!res.ok) {
-                const json = await res.json();
-                toast.error("Failed to update old items: " + (json.error ?? ""));
-                setUpdatingOldItems(false);
-                return;
-            }
-
-            toast.success(`${selectedDisposeIds.size} item(s) updated to Dispose.`);
-            fetchActivities();
-            setDisposeSheetOpen(false);
-            setSelectedDisposeIds(new Set());
-        } catch (error) {
-            toast.error("Error updating old items.");
-            console.error(error);
-        } finally {
-            setUpdatingOldItems(false);
-        }
+            const res = await fetch("/api/update-status-old-items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: Array.from(selectedDisposeIds), newStatus: "Dispose" }) });
+            if (!res.ok) { const j = await res.json(); toast.error("Failed: " + (j.error ?? "")); setUpdatingOldItems(false); return; }
+            toast.success(`${selectedDisposeIds.size} item(s) marked as Dispose.`); fetchActivities(); setDisposeSheetOpen(false); setSelectedDisposeIds(new Set());
+        } catch { toast.error("Error updating old items."); } finally { setUpdatingOldItems(false); }
     }
 
     const handleBulkUpload = async () => {
-        if (!bulkFile) {
-            toast.error("Please select a CSV file");
-            return;
-        }
-
+        if (!bulkFile) { toast.error("Please select a CSV file"); return; }
         setUploadingBulk(true);
-
         try {
             const text = await bulkFile.text();
             const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
-
-            if (lines.length < 2) {
-                throw new Error("CSV file is empty");
-            }
-
+            if (lines.length < 2) throw new Error("CSV file is empty");
             const headers = lines[0].split(",").map(h => h.trim());
-
-            const allowedFields = [
-                "asset_tag",
-                "asset_type",
-                "status",
-                "location",
-                "new_user",
-                "old_user",
-                "department",
-                "position",
-                "brand",
-                "model",
-                "processor",
-                "ram",
-                "storage",
-                "serial_number",
-                "purchase_date",
-                "warranty_date",
-                "asset_age",
-                "amount",
-                "remarks",
-                "mac_address",
-            ];
-
-            // validate headers
-            const invalidHeaders = headers.filter(h => !allowedFields.includes(h));
-            if (invalidHeaders.length > 0) {
-                throw new Error(`Invalid column(s): ${invalidHeaders.join(", ")}`);
-            }
-
-            const records = lines.slice(1).map((line, index) => {
-                const values = line.split(",").map(v => v.replace(/^"|"$/g, "").trim());
-
-                const row: any = {
-                    referenceid: bulkReferenceId,
-                    status: "Spare", // default
-                };
-
-                headers.forEach((h, i) => {
-                    row[h] = values[i] || null;
-                });
-
-                return row;
-            });
-
-            const { error } = await supabase
-                .from("inventory")
-                .insert(records);
-
+            const allowed = ["asset_tag","asset_type","status","location","new_user","old_user","department","position","brand","model","processor","ram","storage","serial_number","purchase_date","warranty_date","asset_age","amount","remarks","mac_address"];
+            const invalid = headers.filter(h => !allowed.includes(h));
+            if (invalid.length > 0) throw new Error(`Invalid column(s): ${invalid.join(", ")}`);
+            const records = lines.slice(1).map(line => { const vals = line.split(",").map(v => v.replace(/^"|"$/g, "").trim()); const row: any = { referenceid: bulkReferenceId, status: "Spare" }; headers.forEach((h, i) => { row[h] = vals[i] || null; }); return row; });
+            const { error } = await supabase.from("inventory").insert(records);
             if (error) throw error;
-
-            toast.success(`${records.length} item(s) uploaded successfully`);
-            setBulkOpen(false);
-            setBulkFile(null);
-            fetchActivities();
-        } catch (err: any) {
-            toast.error(err.message || "Bulk upload failed");
-        } finally {
-            setUploadingBulk(false);
-        }
+            toast.success(`${records.length} record(s) imported.`); setBulkOpen(false); setBulkFile(null); fetchActivities();
+        } catch (e: any) { toast.error(e.message || "Bulk upload failed"); } finally { setUploadingBulk(false); }
     };
 
-    useEffect(() => {
-        setPage(1);
-    }, [search, filters]);
-
-
-    function convertToCSV(items: InventoryItem[]) {
-        if (items.length === 0) return "";
-
-        const headers = [
-            "id",
-            "referenceid",
-            "asset_tag",
-            "asset_type",
-            "status",
-            "location",
-            "new_user",
-            "old_user",
-            "department",
-            "position",
-            "brand",
-            "model",
-            "processor",
-            "ram",
-            "storage",
-            "serial_number",
-            "purchase_date",
-            "warranty_date",
-            "asset_age",
-            "amount",
-            "remarks",
-            "mac_address",
-            "date_created",
-        ];
-
-        const escapeCSV = (value: any) => {
-            if (value == null) return "";
-            const str = value.toString();
-            if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-                return `"${str.replace(/"/g, '""')}"`; // escape double quotes
-            }
-            return str;
-        };
-
-        const csvRows = [
-            headers.join(","), // header row
-            ...items.map((item) =>
-                headers.map((header) => escapeCSV(item[header as keyof InventoryItem])).join(",")
-            ),
-        ];
-
-        return csvRows.join("\n");
-    }
-
     function handleDownloadCSV() {
-        // Use activities or filteredActivities as needed
-        const csv = convertToCSV(activities); // or filteredActivities for filtered data
-        if (!csv) {
-            toast.error("No data available to download");
-            return;
-        }
-
+        const headers = ["id","referenceid","asset_tag","asset_type","status","location","new_user","old_user","department","position","brand","model","processor","ram","storage","serial_number","purchase_date","warranty_date","asset_age","amount","remarks","mac_address","date_created"];
+        const esc = (v: any) => { if (v == null) return ""; const s = v.toString(); return (s.includes(",") || s.includes('"') || s.includes("\n")) ? `"${s.replace(/"/g, '""')}"` : s; };
+        const csv = [headers.join(","), ...activities.map(item => headers.map(h => esc(item[h as keyof InventoryItem])).join(","))].join("\n");
+        if (!csv) { toast.error("No data available"); return; }
         const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
-
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", `inventory_export_${new Date().toISOString().slice(0, 10)}.csv`);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        const link = document.createElement("a"); link.href = url;
+        link.setAttribute("download", `inventory_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link); URL.revokeObjectURL(url);
     }
+
+    useEffect(() => { setPage(1); }, [search, filters]);
+
+    // ── Shared button styles ───────────────────────────────────────────────────
+    const termBtn = "inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border font-mono transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
+    const primaryBtn = `${termBtn} text-black border-transparent` ;
+    const ghostBtn   = `${termBtn}`;
+    const dangerBtn  = `${termBtn}`;
 
     if (errorActivities) {
         return (
-            <Alert variant="destructive" className="flex flex-col space-y-4 p-4 text-xs">
-                <div className="flex items-center space-x-3">
-                    <AlertCircleIcon className="h-6 w-6 text-red-600" />
-                    <div>
-                        <AlertTitle>No Data Found or No Network Connection</AlertTitle>
-                        <AlertDescription className="text-xs">
-                            Please check your internet connection or try again later.
-                        </AlertDescription>
-                    </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                    <CheckCircle2Icon className="h-6 w-6 text-green-600" />
-                    <div>
-                        <AlertTitle className="text-black">Create New Data</AlertTitle>
-                        <AlertDescription className="text-xs">
-                            You can start by adding new entries to populate your database.
-                        </AlertDescription>
-                    </div>
-                </div>
-            </Alert>
+            <div className="font-mono p-6 border text-sm" style={{ backgroundColor: "#080c10", borderColor: "rgba(248,113,113,0.3)", color: "#fca5a5" }}>
+                <div className="flex items-center gap-2 mb-2"><TerminalDot color="#f87171" /><span className="uppercase tracking-widest text-[10px]">CONNECTION ERROR</span></div>
+                <p className="text-[11px] opacity-60">Failed to fetch inventory. Check network or Supabase credentials.</p>
+            </div>
         );
     }
 
     return (
-        <Card className="w-full p-4 rounded-xl flex flex-col">
-            <CardHeader className="p-0 mb-2">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="font-mono flex flex-col gap-0" style={{ backgroundColor: "#080c10", minHeight: "100%" }}>
+
+            {/* ── Dot grid background ── */}
+            <div className="fixed inset-0 pointer-events-none" style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "24px 24px", zIndex: 0 }} />
+
+            <div className="relative z-10 flex flex-col gap-0">
+
+                {/* ── Top bar ── */}
+                <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.02)" }}>
+                    <div className="flex items-center gap-3">
+                        <TerminalDot color="#22c55e" />
+                        <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>INVENTORY SYSTEM</span>
+                        <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.2)" }}>/ {referenceid}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>STATUS</span>
+                        <TerminalDot color="#22c55e" />
+                        <span className="text-[9px] uppercase tracking-widest" style={{ color: "#22c55e" }}>ONLINE</span>
+                    </div>
+                </div>
+
+                {/* ── Stat cards ── */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-px border-b" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                    <StatCard icon={Database} label="Total Assets"    value={stats.total}    accent="#38bdf8" />
+                    <StatCard icon={Activity} label="Deployed"         value={stats.deployed} accent="#22c55e" />
+                    <StatCard icon={HardDrive} label="Spare"           value={stats.spare}    accent="#a78bfa" />
+                    <StatCard icon={Cpu}       label="Issues"          value={stats.defect}   accent="#f87171" />
+                </div>
+
+                {/* ── Toolbar ── */}
+                <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}>
 
                     {/* Search */}
-                    <div className="flex items-center justify-between mb-4 gap-2">
-                        <Input
+                    <div className="relative flex-1 min-w-[180px] max-w-xs">
+                        <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[10px] font-mono select-none" style={{ color: "rgba(255,255,255,0.25)" }}>›</span>
+                        <input
                             type="search"
-                            placeholder="Search..."
+                            placeholder="SEARCH RECORDS..."
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            className="max-w-sm"
+                            className="w-full pl-6 pr-3 py-1.5 text-[10px] font-mono uppercase tracking-widest outline-none border placeholder:opacity-30"
+                            style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}
                         />
-
-                        <Button onClick={handleDownloadCSV} variant="outline">
-                            <DownloadCloud /> Export
-                        </Button>
-
-                        <Button
-                            variant="outline"
-                            className="max-w-sm"
-                            onClick={() => setBulkOpen(true)}
-                        >
-                           <UploadCloud /> Bulk Import
-                        </Button>
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex flex-wrap gap-2 items-center">
-                        <p className="font-semibold text-xs">Total Assets ( Except Dispose Item ):</p>
-                        <Badge className="bg-green-600 text-white py-1 px-2 text-xs">
-                            {totalSpareCount}
-                        </Badge>
+                    <div className="flex flex-wrap items-center gap-1.5 ml-auto">
+                        {/* Export */}
+                        <button onClick={handleDownloadCSV} className={ghostBtn} style={{ color: "rgba(255,255,255,0.5)", borderColor: "rgba(255,255,255,0.1)" }}>
+                            <DownloadCloud className="h-3 w-3" /> EXPORT
+                        </button>
 
+                        {/* Bulk import */}
+                        <button onClick={() => setBulkOpen(true)} className={ghostBtn} style={{ color: "rgba(255,255,255,0.5)", borderColor: "rgba(255,255,255,0.1)" }}>
+                            <UploadCloud className="h-3 w-3" /> IMPORT
+                        </button>
+
+                        {/* Filter */}
+                        <InventoryFilterDialog open={filterSheetOpen} setOpen={setFilterSheetOpen} filters={filters} setFilters={setFilters} resetFilters={resetFilters} applyFilters={applyFilters} />
+
+                        {/* Selected actions */}
                         {selectedIds.size > 0 && (
-                            <Button
-                                variant="destructive"
-                                className="w-full sm:w-auto"
-                                onClick={handleDeleteSelected}
-                            >
-                                <Trash2Icon /> ({selectedIds.size})
-                            </Button>
+                            <>
+                                <button onClick={handleDeleteSelected} className={dangerBtn} style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)", backgroundColor: "rgba(248,113,113,0.06)" }}>
+                                    <Trash2Icon className="h-3 w-3" /> DELETE ({selectedIds.size})
+                                </button>
+                                {showPrintButton && (
+                                    <div className="flex items-center gap-1">
+                                        <select
+                                            value={printCompany}
+                                            onChange={(e) => setPrintCompany(e.target.value as "ecoshift" | "disruptive")}
+                                            disabled={isPdfGenerating}
+                                            className="h-8 px-2 text-[9px] font-mono uppercase tracking-widest border outline-none"
+                                            style={{ backgroundColor: "rgba(56,189,248,0.06)", borderColor: "rgba(56,189,248,0.3)", color: "#7dd3fc" }}
+                                        >
+                                            <option value="ecoshift">ECOSHIFT</option>
+                                            <option value="disruptive">DISRUPTIVE</option>
+                                        </select>
+                                        <button onClick={handlePrintBulk} disabled={isPdfGenerating} className={primaryBtn} style={{ backgroundColor: "#38bdf8" }}>
+                                            <Printer className="h-3 w-3" /> {isPdfGenerating ? "GENERATING..." : "PRINT"}
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         )}
 
-                        {showPrintButton && (
-                            <div className="flex items-center gap-1 w-full sm:w-auto">
-                                <select
-                                    value={printCompany}
-                                    onChange={(e) => setPrintCompany(e.target.value as "ecoshift" | "disruptive")}
-                                    disabled={isPdfGenerating}
-                                    className="h-9 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                                >
-                                    <option value="ecoshift">Ecoshift</option>
-                                    <option value="disruptive">Disruptive</option>
-                                </select>
-                                <Button
-                                    className="w-full sm:w-auto"
-                                    onClick={handlePrintBulk}
-                                    disabled={isPdfGenerating}
-                                >
-                                  <Printer />  {isPdfGenerating ? "Generating PDF..." : "Print"}
-                                </Button>
-                            </div>
-                        )}
+                        {/* Add new */}
+                        <button onClick={() => { resetForm(); setOpen(true); }} className={primaryBtn} style={{ backgroundColor: "#22c55e" }}>
+                            <Plus className="h-3 w-3" /> ADD NEW
+                        </button>
 
-                        <Button
-                            className="w-full sm:w-auto"
-                            onClick={() => {
-                                resetForm();
-                                setOpen(true);
-                            }}
-                        >
-                           <Plus /> Add New
-                        </Button>
-
+                        {/* Dispose old */}
                         {hasOldItems && (
-                            <Button
-                                variant="destructive"
-                                className="w-full sm:w-auto"
-                                onClick={() => {
-                                    setSelectedDisposeIds(new Set()); // reset selection when opening
-                                    setDisposeSheetOpen(true);
-                                }}
-                                disabled={updatingOldItems}
-                            >
-                               <ArchiveIcon /> {updatingOldItems ? "Updating Old Items..." : "Dispose"}
-                            </Button>
+                            <button onClick={() => { setSelectedDisposeIds(new Set()); setDisposeSheetOpen(true); }} disabled={updatingOldItems} className={dangerBtn} style={{ color: "#fbbf24", borderColor: "rgba(251,191,36,0.3)", backgroundColor: "rgba(251,191,36,0.06)" }}>
+                                <ArchiveIcon className="h-3 w-3" /> DISPOSE ({oldItems.length})
+                            </button>
                         )}
-
-                        <InventoryFilterDialog
-                            open={filterSheetOpen}
-                            setOpen={setFilterSheetOpen}
-                            filters={filters}
-                            setFilters={setFilters}
-                            resetFilters={resetFilters}
-                            applyFilters={applyFilters}
-                        />
-
                     </div>
                 </div>
-            </CardHeader>
 
-            {loadingActivities ? (
-                <div className="flex justify-center py-10">
-                    <Spinner />
+                {/* ── Table area ── */}
+                <div className="overflow-x-auto">
+                    {loadingActivities ? (
+                        <div className="flex items-center justify-center gap-3 py-16" style={{ color: "rgba(255,255,255,0.3)" }}>
+                            <div className="w-4 h-4 border-t border-current rounded-full animate-spin" />
+                            <span className="text-[10px] uppercase tracking-widest">LOADING RECORDS...</span>
+                        </div>
+                    ) : filteredActivities.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-16 gap-2">
+                            <Database className="h-6 w-6 opacity-10" />
+                            <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>NO RECORDS FOUND</span>
+                        </div>
+                    ) : (
+                        <table className="w-full border-collapse text-[11px]" style={{ minWidth: "1200px" }}>
+                            <thead>
+                                <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                                    <th className="px-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)", width: "32px" }}>
+                                        <input type="checkbox" onChange={toggleSelectAll} checked={paginatedActivities.length > 0 && paginatedActivities.every(i => selectedIds.has(i.id))}
+                                            className="w-3 h-3 accent-cyan-400" />
+                                    </th>
+                                    <THead>Action</THead>
+                                    <THead>Asset Tag</THead>
+                                    <THead>Type</THead>
+                                    <THead>Status</THead>
+                                    <THead>Location</THead>
+                                    <THead>New User</THead>
+                                    <THead>Old User</THead>
+                                    <THead>Dept</THead>
+                                    <THead>Position</THead>
+                                    <THead>Brand</THead>
+                                    <THead>Model</THead>
+                                    <THead>Processor</THead>
+                                    <THead>RAM</THead>
+                                    <THead>Storage</THead>
+                                    <THead>Serial</THead>
+                                    <THead>Purchase Date</THead>
+                                    <THead>Age</THead>
+                                    <THead>Amount</THead>
+                                    <THead>Remarks</THead>
+                                    <THead>MAC</THead>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {paginatedActivities.map((item, idx) => {
+                                    const isSelected = selectedIds.has(item.id);
+                                    return (
+                                        <tr key={item.id}
+                                            onClick={() => toggleSelect(item.id)}
+                                            className="cursor-pointer transition-colors duration-75"
+                                            style={{ backgroundColor: isSelected ? "rgba(56,189,248,0.06)" : idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.012)" }}>
+                                            <td className="px-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                                <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(item.id)} onClick={e => e.stopPropagation()} className="w-3 h-3 accent-cyan-400" />
+                                            </td>
+                                            <td className="px-3 py-2.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); openEditDialog(item); }}
+                                                    className={`${ghostBtn} text-[9px] py-1 px-2`}
+                                                    style={{ color: "rgba(255,255,255,0.4)", borderColor: "rgba(255,255,255,0.1)" }}>
+                                                    EDIT
+                                                </button>
+                                            </td>
+                                            <TCell mono>{item.asset_tag}</TCell>
+                                            <TCell>
+                                                <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.45)" }}>
+                                                    {item.asset_type}
+                                                </span>
+                                            </TCell>
+                                            <TCell><StatusBadge status={item.status} /></TCell>
+                                            <TCell>{item.location}</TCell>
+                                            <TCell>
+                                                {item.new_user
+                                                    ? <span style={{ color: "#7dd3fc" }}>{item.new_user}</span>
+                                                    : <span style={{ color: "rgba(255,255,255,0.18)" }}>—</span>}
+                                            </TCell>
+                                            <TCell>{item.old_user}</TCell>
+                                            <TCell>{item.department}</TCell>
+                                            <TCell>{item.position}</TCell>
+                                            <TCell>{item.brand}</TCell>
+                                            <TCell>{item.model}</TCell>
+                                            <TCell mono>{item.processor}</TCell>
+                                            <TCell mono>{item.ram}</TCell>
+                                            <TCell mono>{item.storage}</TCell>
+                                            <TCell mono>{item.serial_number}</TCell>
+                                            <TCell mono>{item.purchase_date ? new Date(item.purchase_date).toLocaleDateString() : ""}</TCell>
+                                            <TCell mono>{item.asset_age}</TCell>
+                                            <TCell mono>{item.amount}</TCell>
+                                            <TCell>{item.remarks}</TCell>
+                                            <TCell mono>{item.mac_address}</TCell>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
-            ) : filteredActivities.length === 0 ? (
-                <div className="text-muted-foreground text-sm p-3 border rounded-lg text-center">
-                    No inventory data available.
-                </div>
-            ) : (
-                <>
-                    <Table className="text-xs">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>
-                                    <input
-                                        type="checkbox"
-                                        onChange={toggleSelectAll}
-                                        checked={
-                                            paginatedActivities.length > 0 &&
-                                            paginatedActivities.every((item) => selectedIds.has(item.id))
-                                        }
-                                        aria-label="Select all items on page"
-                                    />
-                                </TableHead>
-                                <TableHead>Actions</TableHead>
-                                <TableHead>Asset Tag</TableHead>
-                                <TableHead>Asset Type</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Location</TableHead>
-                                <TableHead>New User</TableHead>
-                                <TableHead>Old User</TableHead>
-                                <TableHead>Department</TableHead>
-                                <TableHead>Position</TableHead>
-                                <TableHead>Brand</TableHead>
-                                <TableHead>Model</TableHead>
-                                <TableHead>Processor</TableHead>
-                                <TableHead>RAM</TableHead>
-                                <TableHead>Storage</TableHead>
-                                <TableHead>Serial Number</TableHead>
-                                <TableHead>Purchase Date</TableHead>
-                                <TableHead>Asset Age</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Remarks</TableHead>
-                                <TableHead>MAC Address</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginatedActivities.map((item) => (
-                                <TableRow key={item.id} className="odd:bg-white even:bg-gray-50">
-                                    <TableCell>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(item.id)}
-                                            onChange={() => toggleSelect(item.id)}
-                                            aria-label={`Select item ${item.asset_tag || item.id}`}
-                                        />
-                                    </TableCell>
-                                    <TableCell>
-                                        <Button size="sm" variant="outline" onClick={() => openEditDialog(item)}>
-                                            Edit
-                                        </Button>
-                                    </TableCell>
-                                    <TableCell>{item.asset_tag || "-"}</TableCell>
-                                    <TableCell>{item.asset_type || "-"}</TableCell>
-                                    <TableCell>
-                                        <Badge className={statusColors[item.status] ?? "bg-gray-100 text-gray-700 uppercase"}>
-                                            {item.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>{item.location || "-"}</TableCell>
-                                    <TableCell>{item.new_user || "-"}</TableCell>
-                                    <TableCell>{item.old_user || "-"}</TableCell>
-                                    <TableCell>{item.department || "-"}</TableCell>
-                                    <TableCell>{item.position || "-"}</TableCell>
-                                    <TableCell>{item.brand || "-"}</TableCell>
-                                    <TableCell>{item.model || "-"}</TableCell>
-                                    <TableCell>{item.processor || "-"}</TableCell>
-                                    <TableCell>{item.ram || "-"}</TableCell>
-                                    <TableCell>{item.storage || "-"}</TableCell>
-                                    <TableCell>{item.serial_number || "-"}</TableCell>
-                                    <TableCell>
-                                        {item.purchase_date ? new Date(item.purchase_date).toLocaleDateString() : "-"}
-                                    </TableCell>
-                                    <TableCell>{item.asset_age || "-"}</TableCell>
-                                    <TableCell>{item.amount || "-"}</TableCell>
-                                    <TableCell>{item.remarks || "-"}</TableCell>
-                                    <TableCell>{item.mac_address || "-"}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
 
-                    <div className="flex justify-end mt-4">
-                        <Pagination>
-                            <PaginationContent className="flex items-center space-x-4">
-                                <PaginationItem>
-                                    <PaginationPrevious
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            if (page > 1) setPage(page - 1);
-                                        }}
-                                        aria-disabled={page <= 1}
-                                        className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                                    />
-                                </PaginationItem>
-
-                                <div className="px-4 font-medium">{pageCount === 0 ? "0 / 0" : `${page} / ${pageCount}`}</div>
-
-                                <PaginationItem>
-                                    <PaginationNext
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            if (page < pageCount) setPage(page + 1);
-                                        }}
-                                        aria-disabled={page >= pageCount}
-                                        className={page >= pageCount ? "pointer-events-none opacity-50" : ""}
-                                    />
-                                </PaginationItem>
-                            </PaginationContent>
-                        </Pagination>
+                {/* ── Pagination ── */}
+                {filteredActivities.length > 0 && (
+                    <div className="flex items-center justify-between px-4 py-2.5 border-t" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                        <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.25)" }}>
+                            {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredActivities.length)} of {filteredActivities.length} records
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <button onClick={() => page > 1 && setPage(page - 1)} disabled={page <= 1}
+                                className={`${ghostBtn} text-[9px] py-1`}
+                                style={{ color: page <= 1 ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.5)", borderColor: "rgba(255,255,255,0.08)" }}>
+                                ← PREV
+                            </button>
+                            <span className="px-3 text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.4)" }}>
+                                {pageCount === 0 ? "0/0" : `${page}/${pageCount}`}
+                            </span>
+                            <button onClick={() => page < pageCount && setPage(page + 1)} disabled={page >= pageCount}
+                                className={`${ghostBtn} text-[9px] py-1`}
+                                style={{ color: page >= pageCount ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.5)", borderColor: "rgba(255,255,255,0.08)" }}>
+                                NEXT →
+                            </button>
+                        </div>
                     </div>
-                </>
-            )}
+                )}
+            </div>
 
+            {/* ── Dispose Sheet ── */}
             <Sheet open={disposeSheetOpen} onOpenChange={setDisposeSheetOpen}>
-                <SheetContent className="max-w-3xl">
+                <SheetContent className="max-w-3xl border-l font-mono" style={{ backgroundColor: "#0d1117", borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>
                     <SheetHeader>
-                        <SheetTitle>Update Old Items to Dispose</SheetTitle>
-                        <SheetDescription>
-                            Select the items you want to mark as Dispose.
+                        <SheetTitle className="text-[11px] uppercase tracking-widest font-mono" style={{ color: "#fbbf24" }}>
+                            <TerminalDot color="#fbbf24" /> Mark As Dispose
+                        </SheetTitle>
+                        <SheetDescription className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>
+                            Assets 5+ years old. Select items to mark as DISPOSE.
                         </SheetDescription>
                     </SheetHeader>
-
-                    <div className="overflow-auto max-h-[60vh] mt-4 p-4">
-                        <Accordion type="multiple" className="w-full">
-                            {/* Select All Checkbox */}
-                            <div className="flex items-center mb-4">
-                                <input
-                                    type="checkbox"
-                                    id="selectAllDispose"
-                                    className="mr-2"
-                                    checked={selectedDisposeIds.size === oldItems.length && oldItems.length > 0}
-                                    onChange={toggleDisposeSelectAll}
-                                />
-                                <label htmlFor="selectAllDispose" className="font-semibold">Select All</label>
-                            </div>
-
+                    <div className="overflow-auto max-h-[60vh] mt-4">
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                            <input type="checkbox" id="selectAllDispose" checked={selectedDisposeIds.size === oldItems.length && oldItems.length > 0} onChange={toggleDisposeSelectAll} className="w-3 h-3 accent-yellow-400" />
+                            <label htmlFor="selectAllDispose" className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>SELECT ALL</label>
+                        </div>
+                        <Accordion type="multiple" className="w-full space-y-px">
                             {oldItems.map((item) => (
-                                <AccordionItem key={item.id} value={item.id}>
-                                    <AccordionTrigger className="flex justify-between items-center">
-                                        <div className="space-x-2">
-                                            <input
-                                                type="checkbox"
-                                                checked={selectedDisposeIds.has(item.id)}
-                                                onChange={(e) => {
-                                                    e.stopPropagation(); // prevent accordion toggle on checkbox click
-                                                    toggleDisposeSelect(item.id);
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                className="ml-4"
-                                            />
-                                            <span>{item.asset_tag || "No Asset Tag"}</span>
+                                <AccordionItem key={item.id} value={item.id} className="border-0">
+                                    <AccordionTrigger className="px-3 py-2 text-[10px] hover:no-underline" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderLeft: selectedDisposeIds.has(item.id) ? "2px solid #fbbf24" : "2px solid transparent" }}>
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" checked={selectedDisposeIds.has(item.id)} onChange={(e) => { e.stopPropagation(); toggleDisposeSelect(item.id); }} onClick={e => e.stopPropagation()} className="w-3 h-3 accent-yellow-400" />
+                                            <span className="font-mono" style={{ color: "rgba(255,255,255,0.7)" }}>{item.asset_tag || "NO TAG"}</span>
+                                            <span style={{ color: "rgba(255,255,255,0.3)" }}>{item.brand} {item.model}</span>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="px-4 pb-4">
-                                        <div className="grid grid-cols-1 gap-4 text-sm">
-                                            <div><strong>Model:</strong> {item.model || "-"}</div>
-                                            <div><strong>Brand:</strong> {item.brand || "-"}</div>
-                                            <div><strong>Department:</strong> {item.department || "-"}</div>
-                                            <div><strong>Location:</strong> {item.location || "-"}</div>
-                                            <div><strong>Asset Type:</strong> {item.asset_type || "-"}</div>
-                                            <div><strong>Status:</strong> {item.status || "-"}</div>
-                                            <div><strong>Serial Number:</strong> {item.serial_number || "-"}</div>
-                                            <div><strong>Purchase Date:</strong> {item.purchase_date || "-"}</div>
-                                            <div><strong>Remarks:</strong> {item.remarks || "-"}</div>
-                                        </div>
+                                    <AccordionContent className="px-4 pb-3 pt-1 text-[10px] font-mono grid grid-cols-2 gap-1.5" style={{ color: "rgba(255,255,255,0.45)" }}>
+                                        {[["Dept", item.department], ["Location", item.location], ["Type", item.asset_type], ["Status", item.status], ["Serial", item.serial_number], ["Purchased", item.purchase_date]].map(([k, v]) => (
+                                            <div key={k} className="flex gap-2"><span style={{ color: "rgba(255,255,255,0.25)" }}>{k}:</span><span>{v || "—"}</span></div>
+                                        ))}
                                     </AccordionContent>
                                 </AccordionItem>
                             ))}
                         </Accordion>
                     </div>
-
-                    <div className="flex justify-end gap-3 mt-6">
-                        <Button variant="outline" onClick={() => setDisposeSheetOpen(false)} disabled={updatingOldItems}>
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={confirmUpdateDispose}
-                            disabled={updatingOldItems || selectedDisposeIds.size === 0}
-                        >
-                            {updatingOldItems ? "Updating..." : "Update Selected"}
-                        </Button>
+                    <div className="flex justify-end gap-2 mt-4 pt-4 border-t" style={{ borderColor: "rgba(255,255,255,0.07)" }}>
+                        <button onClick={() => setDisposeSheetOpen(false)} disabled={updatingOldItems} className={ghostBtn} style={{ color: "rgba(255,255,255,0.4)", borderColor: "rgba(255,255,255,0.1)" }}>CANCEL</button>
+                        <button onClick={confirmUpdateDispose} disabled={updatingOldItems || selectedDisposeIds.size === 0} className={primaryBtn} style={{ backgroundColor: "#fbbf24" }}>
+                            {updatingOldItems ? "UPDATING..." : `DISPOSE (${selectedDisposeIds.size})`}
+                        </button>
                     </div>
                 </SheetContent>
             </Sheet>
 
-            <InventoryDialog
-                open={open}
-                setOpen={setOpen}
-                editingId={editingId}
-                form={form}
-                handleInputChange={handleInputChange}
-                handleSelectChange={handleSelectChange}
-                handleSetAssetTag={handleSetAssetTag}
-                handleSubmit={handleSubmit}
-                handleUpdate={handleUpdate}
-                resetForm={resetForm}
-            />
+            {/* ── Inventory Dialog ── */}
+            <InventoryDialog open={open} setOpen={setOpen} editingId={editingId} form={form} handleInputChange={handleInputChange} handleSelectChange={handleSelectChange} handleSetAssetTag={handleSetAssetTag} handleSubmit={handleSubmit} handleUpdate={handleUpdate} resetForm={resetForm} />
 
+            {/* ── Bulk Upload Dialog ── */}
             <Dialog open={bulkOpen} onOpenChange={setBulkOpen}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md border font-mono" style={{ backgroundColor: "#0d1117", borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>
                     <DialogHeader>
-                        <DialogTitle>Bulk Upload Inventory</DialogTitle>
-                        <DialogDescription>
-                            Upload CSV file. Columns must match inventory fields.
-                        </DialogDescription>
+                        <DialogTitle className="text-[11px] uppercase tracking-widest font-mono" style={{ color: "#38bdf8" }}>BULK IMPORT</DialogTitle>
+                        <DialogDescription className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>Upload a CSV file. Column names must match inventory fields.</DialogDescription>
                     </DialogHeader>
-
-                    <div className="space-y-3">
+                    <div className="space-y-3 py-2">
                         <div>
-                            <label className="text-xs font-medium">Reference ID</label>
-                            <Input
-                                value={bulkReferenceId}
-                                onChange={(e) => setBulkReferenceId(e.target.value)}
-                                disabled
-                            />
+                            <label className="text-[9px] uppercase tracking-widest block mb-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>Reference ID</label>
+                            <input value={bulkReferenceId} disabled className="w-full px-3 py-1.5 text-[11px] font-mono border outline-none" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)" }} />
                         </div>
-
                         <div>
-                            <label className="text-xs font-medium">Upload CSV File</label>
-                            <Input
-                                type="file"
-                                accept=".csv"
-                                onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
-
-                            />
+                            <label className="text-[9px] uppercase tracking-widest block mb-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>CSV File</label>
+                            <input type="file" accept=".csv" onChange={(e) => setBulkFile(e.target.files?.[0] || null)} className="w-full px-3 py-1.5 text-[11px] font-mono border outline-none file:mr-3 file:text-[9px] file:uppercase file:tracking-widest file:border-0 file:bg-transparent" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }} />
                         </div>
                     </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setBulkOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleBulkUpload} disabled={uploadingBulk}>
-                            {uploadingBulk ? "Uploading..." : "Upload"}
-                        </Button>
+                    <DialogFooter className="gap-2">
+                        <button onClick={() => setBulkOpen(false)} className={ghostBtn} style={{ color: "rgba(255,255,255,0.4)", borderColor: "rgba(255,255,255,0.1)" }}>CANCEL</button>
+                        <button onClick={handleBulkUpload} disabled={uploadingBulk} className={primaryBtn} style={{ backgroundColor: "#38bdf8" }}>{uploadingBulk ? "UPLOADING..." : "UPLOAD"}</button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
 
-            {/* Confirm Delete Dialog */}
+            {/* ── Confirm Delete ── */}
             <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-                <DialogContent>
+                <DialogContent className="max-w-sm border font-mono" style={{ backgroundColor: "#0d1117", borderColor: "rgba(248,113,113,0.2)", color: "rgba(255,255,255,0.7)" }}>
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete the selected inventory item(s)? This action cannot be
-                            undone.
+                        <DialogTitle className="text-[11px] uppercase tracking-widest font-mono flex items-center gap-2" style={{ color: "#f87171" }}>
+                            <TerminalDot color="#f87171" /> CONFIRM DELETION
+                        </DialogTitle>
+                        <DialogDescription className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>
+                            {selectedIds.size} record(s) will be permanently deleted. This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={confirmDeletion}>
-                            Delete
-                        </Button>
+                    <DialogFooter className="gap-2">
+                        <button onClick={() => setConfirmDeleteOpen(false)} className={ghostBtn} style={{ color: "rgba(255,255,255,0.4)", borderColor: "rgba(255,255,255,0.1)" }}>CANCEL</button>
+                        <button onClick={confirmDeletion} className={primaryBtn} style={{ backgroundColor: "#f87171" }}>DELETE</button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </Card>
+        </div>
     );
 };

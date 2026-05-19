@@ -30,63 +30,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
     }
 
-    // Account lock checks
-    const now = new Date();
-    const lockDuration = 50 * 365 * 24 * 60 * 60 * 1000;
-    const lockUntil = user.LockUntil ? new Date(user.LockUntil) : null;
-
-    if (user.Status === "Locked" && lockUntil && lockUntil > now) {
-        return res.status(403).json({
-            message: `Account is locked. Try again after ${lockUntil.toLocaleString()}.`,
-            lockUntil: lockUntil.toISOString(),
-        });
-    }
-
     // Validate credentials
     const result = await validateUser({ Email, Password });
 
     if (!result.success || !result.user) {
-        const attempts = (user.LoginAttempts || 0) + 1;
-
-        if (attempts >= 3) {
-            const newLockUntil = new Date(now.getTime() + lockDuration);
-
-            await usersCollection.updateOne(
-                { Email },
-                {
-                    $set: {
-                        LoginAttempts: attempts,
-                        Status: "Locked",
-                        LockUntil: newLockUntil.toISOString(),
-                    },
-                }
-            );
-
-            return res.status(403).json({
-                message: `Account locked after 3 failed attempts. Try again after ${newLockUntil.toLocaleString()}.`,
-                lockUntil: newLockUntil.toISOString(),
-            });
-        }
-
-        await usersCollection.updateOne(
-            { Email },
-            { $set: { LoginAttempts: attempts } }
-        );
-
         return res.status(401).json({ message: "Invalid credentials." });
     }
-
-    // Reset attempts after success
-    await usersCollection.updateOne(
-        { Email },
-        {
-            $set: {
-                LoginAttempts: 0,
-                Status: "Active",
-                LockUntil: null,
-            },
-        }
-    );
 
     const userId = result.user._id.toString();
 

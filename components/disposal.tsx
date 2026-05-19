@@ -1,44 +1,16 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircleIcon, CheckCircle2Icon } from "lucide-react";
-import { Spinner } from "@/components/ui/spinner";
-import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogDescription,
-    DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-    Table,
-    TableBody,
-    TableHead,
-    TableHeader,
-    TableRow,
-    TableCell,
-} from "@/components/ui/table";
-import {
-    Pagination,
-    PaginationContent,
-    PaginationItem,
-    PaginationNext,
-    PaginationPrevious,
-} from "@/components/ui/pagination";
-import { Badge } from "@/components/ui/badge";
+import { Trash2, ChevronLeft, ChevronRight, ClipboardList } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
-
-import { InventoryFilterDialog } from "@/components/inventory-filter-dialog";
 import { supabase } from "@/utils/supabase";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface DisposeItem {
-    id: string; // supabase id
+    id: string;
     referenceid: string;
     asset_tag?: string;
     asset_type?: string;
@@ -66,254 +38,181 @@ interface DisposeItem {
 interface TicketProps {
     referenceid: string;
     dateCreatedFilterRange: DateRange | undefined;
-    setDateCreatedFilterRangeAction: React.Dispatch<
-        React.SetStateAction<DateRange | undefined>
-    >;
+    setDateCreatedFilterRangeAction: React.Dispatch<React.SetStateAction<DateRange | undefined>>;
 }
-
-const statusColors: Record<string, string> = {
-    SPARE: "bg-green-100 text-green-800",
-    DEPLOYED: "bg-blue-100 text-blue-800",
-    LEND: "bg-purple-100 text-purple-800",
-    MISSING: "bg-yellow-100 text-yellow-800",
-    DEFECTIVE: "bg-red-100 text-red-800",
-    DISPOSE: "bg-gray-200 text-gray-800",
-};
 
 const PAGE_SIZE = 10;
 
-export const Disposal: React.FC<TicketProps> = ({
-    referenceid,
-    dateCreatedFilterRange,
-}) => {
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function TerminalDot({ color }: { color: string }) {
+    return (
+        <span
+            className="inline-flex items-center justify-center w-2 h-2 rounded-full shrink-0"
+            style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+        />
+    );
+}
+
+function THead({ children }: { children: React.ReactNode }) {
+    return (
+        <th
+            className="px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.15em] whitespace-nowrap select-none"
+            style={{ color: "rgba(255,255,255,0.3)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+        >
+            {children}
+        </th>
+    );
+}
+
+function TCell({
+    children,
+    mono = false,
+    muted = false,
+}: {
+    children?: React.ReactNode;
+    mono?: boolean;
+    muted?: boolean;
+}) {
+    return (
+        <td
+            className={`px-3 py-2.5 text-[11px] ${mono ? "font-mono" : ""} whitespace-nowrap`}
+            style={{
+                color: muted ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.65)",
+                borderBottom: "1px solid rgba(255,255,255,0.04)",
+            }}
+        >
+            {children || <span style={{ color: "rgba(255,255,255,0.18)" }}>—</span>}
+        </td>
+    );
+}
+
+const termBtn =
+    "inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border font-mono transition-all duration-150 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed";
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export const Disposal: React.FC<TicketProps> = ({ referenceid, dateCreatedFilterRange }) => {
     const [activities, setActivities] = useState<DisposeItem[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(false);
     const [errorActivities, setErrorActivities] = useState<string | null>(null);
 
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState("");
-
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
-    const [filterSheetOpen, setFilterSheetOpen] = useState(false);
 
-    const [filters, setFilters] = useState({
-        status: "",
-        location: "",
-        asset_type: "",
-        department: "",
-        brand: "",
-        model: "",
-        processor: "",
-        storage: "",
-        pageSize: "25",
-    });
-
-    const pageSize = useMemo(() => {
-        const size = Number(filters.pageSize);
-        return Number.isFinite(size) && size > 0 ? size : 25;
-    }, [filters.pageSize]);
-
+    // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchActivities = useCallback(() => {
-        if (!referenceid) {
-            setActivities([]);
-            return;
-        }
+        if (!referenceid) { setActivities([]); return; }
         setLoadingActivities(true);
         setErrorActivities(null);
-
         fetch(`/api/fetch-inventory?referenceid=${encodeURIComponent(referenceid)}`)
             .then(async (res) => {
                 if (!res.ok) throw new Error("Failed to fetch activities");
                 return res.json();
             })
-            .then((data) => {
-                const items: DisposeItem[] = data.data || [];
-                setActivities(items);
-            })
+            .then((data) => setActivities(data.data || []))
             .catch((err) => setErrorActivities(err.message))
             .finally(() => setLoadingActivities(false));
     }, [referenceid]);
 
-
+    // ── Realtime ──────────────────────────────────────────────────────────────
     useEffect(() => {
         fetchActivities();
-
         if (!referenceid) return;
-
-        const channel = supabase
+        const ch = supabase
             .channel(`public:inventory:referenceid=eq.${referenceid}`)
             .on(
                 "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "inventory",
-                    filter: `referenceid=eq.${referenceid}`,
-                },
+                { event: "*", schema: "public", table: "inventory", filter: `referenceid=eq.${referenceid}` },
                 (payload) => {
-                    const newRecord = payload.new as DisposeItem;
-                    const oldRecord = payload.old as DisposeItem;
-
-                    setActivities((curr) => {
+                    const n = payload.new as DisposeItem;
+                    const o = payload.old as DisposeItem;
+                    setActivities((c) => {
                         switch (payload.eventType) {
-                            case "INSERT":
-                                if (!curr.some((a) => a.id === newRecord.id)) {
-                                    return [...curr, newRecord];
-                                }
-                                return curr;
-                            case "UPDATE":
-                                return curr.map((a) => (a.id === newRecord.id ? newRecord : a));
-                            case "DELETE":
-                                return curr.filter((a) => a.id !== oldRecord.id);
-                            default:
-                                return curr;
+                            case "INSERT": return c.some((a) => a.id === n.id) ? c : [...c, n];
+                            case "UPDATE": return c.map((a) => (a.id === n.id ? n : a));
+                            case "DELETE": return c.filter((a) => a.id !== o.id);
+                            default: return c;
                         }
                     });
                 }
             )
             .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
+        return () => { supabase.removeChannel(ch); };
     }, [referenceid, fetchActivities]);
 
-    function handleFilterChange(e: React.ChangeEvent<HTMLInputElement>) {
-        const { name, value } = e.target;
-        setFilters((prev) => ({ ...prev, [name]: value }));
-    }
-
-    function resetFilters() {
-        setFilters({
-            status: "",
-            location: "",
-            asset_type: "",
-            department: "",
-            brand: "",
-            model: "",
-            processor: "",
-            storage: "",
-            pageSize: "25",
-        });
-    }
-
-    function applyFilters() {
-        setPage(1);
-        setFilterSheetOpen(false);
-    }
-
+    // ── Filter ────────────────────────────────────────────────────────────────
     const filteredActivities = useMemo(() => {
-        if (!activities.length) return [];
-
         let startDate: Date | null = null;
         let endDate: Date | null = null;
-
         if (dateCreatedFilterRange?.from) {
             startDate = new Date(dateCreatedFilterRange.from);
             startDate.setHours(0, 0, 0, 0);
         }
-
         if (dateCreatedFilterRange?.to) {
             endDate = new Date(dateCreatedFilterRange.to);
             endDate.setHours(23, 59, 59, 999);
         }
 
-        // Filter first
         const filtered = activities.filter((item) => {
-            // EXCLUDE items with status "Dispose"
             if (item.status !== "Dispose") return false;
-
-            const matchesSearch =
-                search.trim() === "" ||
-                Object.values(item).some((val) =>
-                    val?.toString().toLowerCase().includes(search.toLowerCase())
-                );
-
-            if (!matchesSearch) return false;
-
-            const matchesFilters = Object.entries(filters).every(([key, filterValue]) => {
-                if (!filterValue) return true;
-                if (key === "pageSize") return true; // 👈 IMPORTANT
-
-                const itemValue = item[key as keyof DisposeItem];
-                return (
-                    itemValue
-                        ?.toString()
-                        .toLowerCase()
-                        .includes(filterValue.toLowerCase()) ?? false
-                );
-            });
-
-            if (!matchesFilters) return false;
-
+            if (
+                search.trim() &&
+                !Object.values(item).some((v) =>
+                    v?.toString().toLowerCase().includes(search.toLowerCase())
+                )
+            )
+                return false;
             if (startDate || endDate) {
                 if (!item.purchase_date) return false;
-
-                const itemDate = new Date(item.purchase_date);
-                if (isNaN(itemDate.getTime())) return false;
-
-                if (startDate && itemDate < startDate) return false;
-                if (endDate && itemDate > endDate) return false;
+                const d = new Date(item.purchase_date);
+                if (isNaN(d.getTime())) return false;
+                if (startDate && d < startDate) return false;
+                if (endDate && d > endDate) return false;
             }
-
             return true;
         });
 
-        // Sort descending by asset_tag
         filtered.sort((a, b) => {
-            if (!a.asset_tag) return 1;   // Push undefined asset_tag to the end
+            if (!a.asset_tag) return 1;
             if (!b.asset_tag) return -1;
             return b.asset_tag.localeCompare(a.asset_tag);
         });
 
         return filtered;
-    }, [activities, search, filters, dateCreatedFilterRange]);
+    }, [activities, search, dateCreatedFilterRange]);
 
-    const totalDisposeCount = useMemo(() => {
-        return filteredActivities.length;
-    }, [filteredActivities]);
-    const pageCount = Math.ceil(filteredActivities.length / pageSize);
-
+    const pageCount = Math.ceil(filteredActivities.length / PAGE_SIZE);
     const paginatedActivities = useMemo(() => {
-        const start = (page - 1) * pageSize;
-        return filteredActivities.slice(start, start + pageSize);
-    }, [filteredActivities, page, pageSize]);
+        const s = (page - 1) * PAGE_SIZE;
+        return filteredActivities.slice(s, s + PAGE_SIZE);
+    }, [filteredActivities, page]);
 
+    // ── Selection ─────────────────────────────────────────────────────────────
     function toggleSelect(id: string) {
         setSelectedIds((prev) => {
-            const newSet = new Set(prev);
-            if (newSet.has(id)) {
-                newSet.delete(id);
-            } else {
-                newSet.add(id);
-            }
-            return newSet;
+            const next = new Set(prev);
+            next.has(id) ? next.delete(id) : next.add(id);
+            return next;
         });
     }
 
     function toggleSelectAll() {
         const allSelected = paginatedActivities.every((item) => selectedIds.has(item.id));
-        if (allSelected) {
-            setSelectedIds((prev) => {
-                const newSet = new Set(prev);
-                paginatedActivities.forEach((item) => newSet.delete(item.id));
-                return newSet;
-            });
-        } else {
-            setSelectedIds((prev) => {
-                const newSet = new Set(prev);
-                paginatedActivities.forEach((item) => newSet.add(item.id));
-                return newSet;
-            });
-        }
+        setSelectedIds((prev) => {
+            const next = new Set(prev);
+            if (allSelected) {
+                paginatedActivities.forEach((item) => next.delete(item.id));
+            } else {
+                paginatedActivities.forEach((item) => next.add(item.id));
+            }
+            return next;
+        });
     }
 
-    async function handleDeleteSelected() {
-        if (selectedIds.size === 0) return;
-        setConfirmDeleteOpen(true);
-    }
-
+    // ── Delete ────────────────────────────────────────────────────────────────
     async function confirmDeletion() {
         try {
             const res = await fetch("/api/delete-inventory", {
@@ -321,12 +220,10 @@ export const Disposal: React.FC<TicketProps> = ({
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ids: Array.from(selectedIds) }),
             });
-
             if (!res.ok) {
                 const json = await res.json();
                 throw new Error(json.error || "Failed to delete inventory items");
             }
-
             toast.success(`${selectedIds.size} item(s) deleted successfully.`);
             setSelectedIds(new Set());
             setConfirmDeleteOpen(false);
@@ -337,212 +234,296 @@ export const Disposal: React.FC<TicketProps> = ({
         }
     }
 
-    if (errorActivities) {
-        return (
-            <Alert variant="destructive" className="flex flex-col space-y-4 p-4 text-xs">
-                <div className="flex items-center space-x-3">
-                    <AlertCircleIcon className="h-6 w-6 text-red-600" />
-                    <div>
-                        <AlertTitle>No Data Found or No Network Connection</AlertTitle>
-                        <AlertDescription className="text-xs">
-                            Please check your internet connection or try again later.
-                        </AlertDescription>
-                    </div>
-                </div>
-
-                <div className="flex items-center space-x-3">
-                    <CheckCircle2Icon className="h-6 w-6 text-green-600" />
-                    <div>
-                        <AlertTitle className="text-black">Create New Data</AlertTitle>
-                        <AlertDescription className="text-xs">
-                            You can start by adding new entries to populate your database.
-                        </AlertDescription>
-                    </div>
-                </div>
-            </Alert>
-        );
-    }
+    // ─────────────────────────────────────────────────────────────────────────
 
     return (
-        <Card className="w-full p-4 rounded-xl flex flex-col">
-            <CardHeader className="p-0 mb-2">
-                <div className="flex items-center justify-between space-x-4">
-                    <Input
-                        placeholder="Search inventory..."
-                        className="text-xs flex-grow max-w-[400px]"
-                        value={search}
-                        onChange={(e) => {
-                            setSearch(e.target.value);
-                            setPage(1);
-                            setSelectedIds(new Set());
-                        }}
-                    />
+        <div className="font-mono flex flex-col gap-0" style={{ backgroundColor: "#080c10", minHeight: "100%" }}>
 
-                    <div className="flex space-x-2 items-center">
+            {/* Dot grid */}
+            <div
+                className="fixed inset-0 pointer-events-none"
+                style={{
+                    backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)",
+                    backgroundSize: "24px 24px",
+                    zIndex: 0,
+                }}
+            />
 
-                        <Badge variant="destructive" className="py-2 px-4 text-sm">
-                            Total: {totalDisposeCount}
-                        </Badge>
+            <div className="relative z-10 flex flex-col gap-4 p-4">
 
-
+                {/* ── Top bar ── */}
+                <div
+                    className="flex items-center justify-between px-4 py-2.5 border"
+                    style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.02)" }}
+                >
+                    <div className="flex items-center gap-3">
+                        <TerminalDot color="#f87171" />
+                        <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>
+                            DISPOSAL RECORDS
+                        </span>
+                        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
+                            / {referenceid}
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <span
+                            className="text-[9px] uppercase tracking-widest px-2 py-0.5 border font-mono"
+                            style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)", backgroundColor: "rgba(248,113,113,0.06)" }}
+                        >
+                            {filteredActivities.length} DISPOSED
+                        </span>
                         {selectedIds.size > 0 && (
-                            <Button variant="destructive" onClick={handleDeleteSelected}>
-                                Delete Selected ({selectedIds.size})
-                            </Button>
+                            <button
+                                onClick={() => setConfirmDeleteOpen(true)}
+                                className={termBtn}
+                                style={{ backgroundColor: "#f87171", color: "#000", borderColor: "transparent" }}
+                            >
+                                <Trash2 className="h-3 w-3" />
+                                DELETE ({selectedIds.size})
+                            </button>
                         )}
-
-                        <InventoryFilterDialog
-                            open={filterSheetOpen}
-                            setOpen={setFilterSheetOpen}
-                            filters={filters}
-                            setFilters={setFilters}
-                            resetFilters={resetFilters}
-                            applyFilters={applyFilters}
-                        />
                     </div>
                 </div>
-            </CardHeader>
 
-            {loadingActivities ? (
-                <div className="flex justify-center py-10">
-                    <Spinner />
-                </div>
-            ) : filteredActivities.length === 0 ? (
-                <div className="text-muted-foreground text-sm p-3 border rounded-lg text-center">
-                    No inventory data available.
-                </div>
-            ) : (
-                <>
-                    <Table className="text-xs">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>
-                                    <input
-                                        type="checkbox"
-                                        onChange={toggleSelectAll}
-                                        checked={
-                                            paginatedActivities.length > 0 &&
-                                            paginatedActivities.every((item) => selectedIds.has(item.id))
-                                        }
-                                        aria-label="Select all items on page"
-                                    />
-                                </TableHead>
-                                <TableHead>Asset Tag</TableHead>
-                                <TableHead>Asset Type</TableHead>
-                                <TableHead>Status</TableHead>
-                                <TableHead>Location</TableHead>
-                                <TableHead>New User</TableHead>
-                                <TableHead>Old User</TableHead>
-                                <TableHead>Department</TableHead>
-                                <TableHead>Position</TableHead>
-                                <TableHead>Brand</TableHead>
-                                <TableHead>Model</TableHead>
-                                <TableHead>Processor</TableHead>
-                                <TableHead>RAM</TableHead>
-                                <TableHead>Storage</TableHead>
-                                <TableHead>Serial Number</TableHead>
-                                <TableHead>Purchase Date</TableHead>
-                                <TableHead>Asset Age</TableHead>
-                                <TableHead>Amount</TableHead>
-                                <TableHead>Remarks</TableHead>
-                                <TableHead>MAC Address</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {paginatedActivities.map((item) => (
-                                <TableRow key={item.id} className="odd:bg-white even:bg-gray-50">
-                                    <TableCell>
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedIds.has(item.id)}
-                                            onChange={() => toggleSelect(item.id)}
-                                            aria-label={`Select item ${item.asset_tag || item.id}`}
-                                        />
-                                    </TableCell>
-                                    <TableCell>{item.asset_tag || "-"}</TableCell>
-                                    <TableCell>{item.asset_type || "-"}</TableCell>
-                                    <TableCell>
-                                        <Badge className={statusColors[item.status] ?? "bg-gray-100 text-gray-700"}>
-                                            {item.status}
-                                        </Badge>
-                                    </TableCell>
-                                    <TableCell>{item.location || "-"}</TableCell>
-                                    <TableCell>{item.new_user || "-"}</TableCell>
-                                    <TableCell>{item.old_user || "-"}</TableCell>
-                                    <TableCell>{item.department || "-"}</TableCell>
-                                    <TableCell>{item.position || "-"}</TableCell>
-                                    <TableCell>{item.brand || "-"}</TableCell>
-                                    <TableCell>{item.model || "-"}</TableCell>
-                                    <TableCell>{item.processor || "-"}</TableCell>
-                                    <TableCell>{item.ram || "-"}</TableCell>
-                                    <TableCell>{item.storage || "-"}</TableCell>
-                                    <TableCell>{item.serial_number || "-"}</TableCell>
-                                    <TableCell>
-                                        {item.purchase_date ? new Date(item.purchase_date).toLocaleDateString() : "-"}
-                                    </TableCell>
-                                    <TableCell>{item.asset_age || "-"}</TableCell>
-                                    <TableCell>{item.amount || "-"}</TableCell>
-                                    <TableCell>{item.remarks || "-"}</TableCell>
-                                    <TableCell>{item.mac_address || "-"}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-
-                    <div className="flex justify-end mt-4">
-                        <Pagination>
-                            <PaginationContent className="flex items-center space-x-4">
-                                <PaginationItem>
-                                    <PaginationPrevious
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            if (page > 1) setPage(page - 1);
-                                        }}
-                                        aria-disabled={page <= 1}
-                                        className={page <= 1 ? "pointer-events-none opacity-50" : ""}
-                                    />
-                                </PaginationItem>
-
-                                <div className="px-4 font-medium">{pageCount === 0 ? "0 / 0" : `${page} / ${pageCount}`}</div>
-
-                                <PaginationItem>
-                                    <PaginationNext
-                                        href="#"
-                                        onClick={(e) => {
-                                            e.preventDefault();
-                                            if (page < pageCount) setPage(page + 1);
-                                        }}
-                                        aria-disabled={page >= pageCount}
-                                        className={page >= pageCount ? "pointer-events-none opacity-50" : ""}
-                                    />
-                                </PaginationItem>
-                            </PaginationContent>
-                        </Pagination>
+                {/* ── Table panel ── */}
+                <div
+                    className="border flex flex-col"
+                    style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                >
+                    {/* Panel header */}
+                    <div
+                        className="flex items-center justify-between px-4 py-2.5 border-b"
+                        style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}
+                    >
+                        <div className="flex items-center gap-2">
+                            <ClipboardList className="h-3.5 w-3.5" style={{ color: "rgba(255,255,255,0.3)" }} />
+                            <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>
+                                DISPOSED ASSETS
+                            </span>
+                        </div>
+                        {/* Search */}
+                        <div className="relative">
+                            <span
+                                className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-mono select-none"
+                                style={{ color: "rgba(255,255,255,0.25)" }}
+                            >
+                                ›
+                            </span>
+                            <input
+                                type="search"
+                                placeholder="FILTER..."
+                                value={search}
+                                onChange={(e) => { setSearch(e.target.value); setPage(1); setSelectedIds(new Set()); }}
+                                className="pl-5 pr-3 py-1 text-[10px] font-mono uppercase tracking-widest border outline-none w-44 placeholder:opacity-30"
+                                style={{
+                                    backgroundColor: "rgba(255,255,255,0.03)",
+                                    borderColor: "rgba(255,255,255,0.08)",
+                                    color: "rgba(255,255,255,0.6)",
+                                }}
+                            />
+                        </div>
                     </div>
-                </>
-            )}
 
-            {/* Confirm Delete Dialog */}
+                    {/* Table */}
+                    <div className="overflow-x-auto flex-1">
+                        {loadingActivities ? (
+                            <div className="flex items-center justify-center gap-2 py-10" style={{ color: "rgba(255,255,255,0.25)" }}>
+                                <div className="w-3.5 h-3.5 border-t border-current rounded-full animate-spin" />
+                                <span className="text-[9px] uppercase tracking-widest">LOADING...</span>
+                            </div>
+                        ) : errorActivities ? (
+                            <div className="flex items-center gap-2 p-4 text-[10px]" style={{ color: "#f87171" }}>
+                                <TerminalDot color="#f87171" /> {errorActivities}
+                            </div>
+                        ) : filteredActivities.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                <ClipboardList className="h-6 w-6 opacity-10" />
+                                <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                                    NO DISPOSAL RECORDS
+                                </span>
+                            </div>
+                        ) : (
+                            <table className="w-full border-collapse" style={{ minWidth: "1200px" }}>
+                                <thead>
+                                    <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                                        <THead>
+                                            <input
+                                                type="checkbox"
+                                                onChange={toggleSelectAll}
+                                                checked={
+                                                    paginatedActivities.length > 0 &&
+                                                    paginatedActivities.every((item) => selectedIds.has(item.id))
+                                                }
+                                                aria-label="Select all items on page"
+                                                className="accent-red-400"
+                                            />
+                                        </THead>
+                                        <THead>Asset Tag</THead>
+                                        <THead>Type</THead>
+                                        <THead>Status</THead>
+                                        <THead>Location</THead>
+                                        <THead>New User</THead>
+                                        <THead>Old User</THead>
+                                        <THead>Department</THead>
+                                        <THead>Position</THead>
+                                        <THead>Brand</THead>
+                                        <THead>Model</THead>
+                                        <THead>Processor</THead>
+                                        <THead>RAM</THead>
+                                        <THead>Storage</THead>
+                                        <THead>Serial</THead>
+                                        <THead>Purchase Date</THead>
+                                        <THead>Asset Age</THead>
+                                        <THead>Amount</THead>
+                                        <THead>Remarks</THead>
+                                        <THead>MAC Address</THead>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {paginatedActivities.map((item, idx) => (
+                                        <tr
+                                            key={item.id}
+                                            style={{
+                                                backgroundColor: selectedIds.has(item.id)
+                                                    ? "rgba(248,113,113,0.06)"
+                                                    : idx % 2 === 0
+                                                    ? "transparent"
+                                                    : "rgba(255,255,255,0.012)",
+                                            }}
+                                        >
+                                            <td
+                                                className="px-3 py-2.5"
+                                                style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedIds.has(item.id)}
+                                                    onChange={() => toggleSelect(item.id)}
+                                                    aria-label={`Select item ${item.asset_tag || item.id}`}
+                                                    className="accent-red-400"
+                                                />
+                                            </td>
+                                            <TCell mono>{item.asset_tag}</TCell>
+                                            <TCell>{item.asset_type}</TCell>
+                                            <TCell>
+                                                <span
+                                                    className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border"
+                                                    style={{
+                                                        color: "#f87171",
+                                                        borderColor: "rgba(248,113,113,0.3)",
+                                                        backgroundColor: "rgba(248,113,113,0.08)",
+                                                    }}
+                                                >
+                                                    {item.status}
+                                                </span>
+                                            </TCell>
+                                            <TCell>{item.location}</TCell>
+                                            <TCell>{item.new_user}</TCell>
+                                            <TCell>{item.old_user}</TCell>
+                                            <TCell>{item.department}</TCell>
+                                            <TCell>{item.position}</TCell>
+                                            <TCell>{item.brand}</TCell>
+                                            <TCell>{item.model}</TCell>
+                                            <TCell>{item.processor}</TCell>
+                                            <TCell>{item.ram}</TCell>
+                                            <TCell>{item.storage}</TCell>
+                                            <TCell mono>{item.serial_number}</TCell>
+                                            <TCell muted>
+                                                {item.purchase_date
+                                                    ? new Date(item.purchase_date).toLocaleDateString(undefined, {
+                                                          year: "numeric",
+                                                          month: "short",
+                                                          day: "numeric",
+                                                      })
+                                                    : undefined}
+                                            </TCell>
+                                            <TCell>{item.asset_age}</TCell>
+                                            <TCell>{item.amount}</TCell>
+                                            <TCell>{item.remarks}</TCell>
+                                            <TCell mono>{item.mac_address}</TCell>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        )}
+                    </div>
+
+                    {/* Pagination */}
+                    <div
+                        className="flex items-center justify-between px-4 py-2 border-t"
+                        style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.2)" }}
+                    >
+                        <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                            {filteredActivities.length === 0
+                                ? "0 RECORDS"
+                                : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredActivities.length)} OF ${filteredActivities.length}`}
+                        </span>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={() => page > 1 && setPage(page - 1)}
+                                disabled={page <= 1}
+                                className={`${termBtn} text-[9px] py-1 px-2`}
+                                style={{
+                                    color: page <= 1 ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.45)",
+                                    borderColor: "rgba(255,255,255,0.08)",
+                                }}
+                            >
+                                <ChevronLeft className="h-3 w-3" />
+                            </button>
+                            <span className="px-2 text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.35)" }}>
+                                {pageCount === 0 ? "0/0" : `${page}/${pageCount}`}
+                            </span>
+                            <button
+                                onClick={() => page < pageCount && setPage(page + 1)}
+                                disabled={page >= pageCount}
+                                className={`${termBtn} text-[9px] py-1 px-2`}
+                                style={{
+                                    color: page >= pageCount ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.45)",
+                                    borderColor: "rgba(255,255,255,0.08)",
+                                }}
+                            >
+                                <ChevronRight className="h-3 w-3" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ── Confirm Delete Dialog ── */}
             <Dialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
-                <DialogContent>
+                <DialogContent
+                    className="max-w-sm border font-mono"
+                    style={{ backgroundColor: "#0d1117", borderColor: "rgba(248,113,113,0.2)", color: "rgba(255,255,255,0.7)" }}
+                >
                     <DialogHeader>
-                        <DialogTitle>Confirm Deletion</DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete the selected inventory item(s)? This action cannot be
-                            undone.
+                        <DialogTitle
+                            className="text-[11px] uppercase tracking-widest font-mono flex items-center gap-2"
+                            style={{ color: "#f87171" }}
+                        >
+                            <TerminalDot color="#f87171" /> CONFIRM DELETION
+                        </DialogTitle>
+                        <DialogDescription className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>
+                            {selectedIds.size} item(s) will be permanently deleted. This action cannot be undone.
                         </DialogDescription>
                     </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setConfirmDeleteOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="destructive" onClick={confirmDeletion}>
-                            Delete
-                        </Button>
+                    <DialogFooter className="gap-2">
+                        <button
+                            onClick={() => setConfirmDeleteOpen(false)}
+                            className={termBtn}
+                            style={{ color: "rgba(255,255,255,0.4)", borderColor: "rgba(255,255,255,0.1)" }}
+                        >
+                            CANCEL
+                        </button>
+                        <button
+                            onClick={confirmDeletion}
+                            className={termBtn}
+                            style={{ backgroundColor: "#f87171", color: "#000", borderColor: "transparent" }}
+                        >
+                            DELETE
+                        </button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </Card>
+        </div>
     );
 };

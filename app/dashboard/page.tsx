@@ -17,45 +17,18 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import {
-  Item,
-  ItemActions,
-  ItemContent,
-  ItemDescription,
-  ItemFooter,
-  ItemHeader,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item"
-import { Separator } from "@/components/ui/separator"
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge"
+import { Separator } from "@/components/ui/separator";
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
 import { supabase } from "@/utils/supabase";
-
 import { StatusCard } from "@/components/dashboard-card-status";
 import { AssetCard } from "@/components/dashboard-card-asset_type";
 import { BrandCard } from "@/components/dashboard-card-brand";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
 interface InventoryItem {
-  id: string; // supabase id
+  id: string;
   status: string;
   asset_tag: string;
   asset_type: string;
@@ -70,344 +43,447 @@ interface UserDetails {
   referenceid: string;
 }
 
-function DashboardContent() {
-  const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = React.useState<
-    DateRange | undefined
-  >(undefined);
+// ─── Sub-components ───────────────────────────────────────────────────────────
 
+function TerminalDot({ color }: { color: string }) {
+  return (
+    <span
+      className="inline-flex items-center justify-center w-2 h-2 rounded-full shrink-0"
+      style={{ backgroundColor: color, boxShadow: `0 0 6px ${color}` }}
+    />
+  );
+}
+
+function THead({ children }: { children: React.ReactNode }) {
+  return (
+    <th
+      className="px-3 py-2.5 text-left text-[9px] font-bold uppercase tracking-[0.15em] whitespace-nowrap select-none"
+      style={{ color: "rgba(255,255,255,0.3)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+    >
+      {children}
+    </th>
+  );
+}
+
+function TCell({ children, mono = false }: { children?: React.ReactNode; mono?: boolean }) {
+  return (
+    <td
+      className={`px-3 py-2.5 text-[11px] ${mono ? "font-mono" : ""} whitespace-nowrap`}
+      style={{ color: "rgba(255,255,255,0.65)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+    >
+      {children || <span style={{ color: "rgba(255,255,255,0.18)" }}>—</span>}
+    </td>
+  );
+}
+
+// ─── Dashboard Content ────────────────────────────────────────────────────────
+
+function DashboardContent() {
+  const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = React.useState<DateRange | undefined>(undefined);
   const searchParams = useSearchParams();
   const { userId, setUserId } = useUser();
 
   const [activities, setActivities] = useState<InventoryItem[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [errorActivities, setErrorActivities] = useState<string | null>(null);
-
   const [loadingUser, setLoadingUser] = useState(true);
   const [errorUser, setErrorUser] = useState<string | null>(null);
+  const [userDetails, setUserDetails] = useState<UserDetails>({ referenceid: "" });
 
-  const [userDetails, setUserDetails] = useState<UserDetails>({
-    referenceid: "",
-  });
-
-  // Get userId from URL query param
   const queryUserId = searchParams?.get("id") ?? "";
 
-  // Sync context with URL param on mount or param change
   useEffect(() => {
-    if (queryUserId && queryUserId !== userId) {
-      setUserId(queryUserId);
-    }
+    if (queryUserId && queryUserId !== userId) setUserId(queryUserId);
   }, [queryUserId, userId, setUserId]);
 
-  // Fetch user details when userId changes
+  // ── Fetch user ────────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!userId) {
-      setErrorUser("User ID is missing.");
-      setLoadingUser(false);
-      return;
-    }
-
+    if (!userId) { setErrorUser("User ID is missing."); setLoadingUser(false); return; }
     const fetchUserData = async () => {
       setErrorUser(null);
       setLoadingUser(true);
       try {
-        const response = await fetch(`/api/user?id=${encodeURIComponent(userId)}`);
-        if (!response.ok) throw new Error("Failed to fetch user data");
-        const data = await response.json();
-
-        setUserDetails({
-          referenceid: data.ReferenceID || "",
-        });
-
+        const res = await fetch(`/api/user?id=${encodeURIComponent(userId)}`);
+        if (!res.ok) throw new Error("Failed to fetch user data");
+        const data = await res.json();
+        setUserDetails({ referenceid: data.ReferenceID || "" });
         toast.success("User data loaded successfully!");
       } catch (err) {
-        console.error("Error fetching user data:", err);
-        setErrorUser(
-          "Failed to connect to server. Please try again later or check your network connection."
-        );
-        toast.error(
-          "Failed to connect to server. Please try again later or refresh your network connection"
-        );
+        setErrorUser("Failed to connect to server. Please try again later or check your network connection.");
+        toast.error("Failed to connect to server. Please refresh or check your network connection.");
       } finally {
         setLoadingUser(false);
       }
     };
-
     fetchUserData();
   }, [userId]);
 
-  // Use referenceid from fetched userDetails (not directly from URL)
   const referenceid = userDetails.referenceid;
 
-  // Fetch activities
+  // ── Fetch inventory ───────────────────────────────────────────────────────
   const fetchActivities = useCallback(() => {
-    if (!referenceid) {
-      setActivities([]);
-      return;
-    }
+    if (!referenceid) { setActivities([]); return; }
     setLoadingActivities(true);
     setErrorActivities(null);
-
     fetch(`/api/fetch-inventory?referenceid=${encodeURIComponent(referenceid)}`)
-      .then(async (res) => {
-        if (!res.ok) throw new Error("Failed to fetch activities");
-        return res.json();
-      })
-      .then((data) => {
-        const items: InventoryItem[] = data.data || [];
-        setActivities(items);
-      })
+      .then(async (res) => { if (!res.ok) throw new Error("Failed to fetch activities"); return res.json(); })
+      .then((data) => setActivities(data.data || []))
       .catch((err) => setErrorActivities(err.message))
       .finally(() => setLoadingActivities(false));
   }, [referenceid]);
 
+  // ── Realtime ──────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchActivities();
-
     if (!referenceid) return;
-
-    // Supabase realtime subscription
-    const channel = supabase
+    const ch = supabase
       .channel(`inventory-${referenceid}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "inventory",
-          filter: `referenceid=eq.${referenceid}`,
-        },
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "inventory", filter: `referenceid=eq.${referenceid}` },
         (payload) => {
-          const newRecord = payload.new as InventoryItem;
-          const oldRecord = payload.old as InventoryItem;
-
-          setActivities((curr) => {
+          const n = payload.new as InventoryItem;
+          const o = payload.old as InventoryItem;
+          setActivities((c) => {
             switch (payload.eventType) {
-              case "INSERT":
-                if (!curr.some((a) => a.id === newRecord.id)) {
-                  return [...curr, newRecord];
-                }
-                return curr;
-              case "UPDATE":
-                return curr.map((a) => (a.id === newRecord.id ? newRecord : a));
-              case "DELETE":
-                return curr.filter((a) => a.id !== oldRecord.id);
-              default:
-                return curr;
+              case "INSERT": return c.some((a) => a.id === n.id) ? c : [...c, n];
+              case "UPDATE": return c.map((a) => (a.id === n.id ? n : a));
+              case "DELETE": return c.filter((a) => a.id !== o.id);
+              default: return c;
             }
           });
         }
       )
       .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(ch); };
   }, [referenceid, fetchActivities]);
 
-  // Count items by status
+  // ── Derived data ──────────────────────────────────────────────────────────
   const counts = React.useMemo(() => {
-    const normalize = (status?: string) => status?.toLowerCase() ?? "";
-
-    const countSpare = activities.filter(
-      (item) => normalize(item.status) === "spare"
-    ).length;
-
-    const countDeploy = activities.filter(
-      (item) => normalize(item.status) === "deployed"
-    ).length;
-
-    const countMissing = activities.filter(
-      (item) => normalize(item.status) === "missing"
-    ).length;
-
-    const countDispose = activities.filter(
-      (item) => normalize(item.status) === "dispose"
-    ).length;
-
-    const countLend = activities.filter(
-      (item) => normalize(item.status) === "lend"
-    ).length;
-
-    const countDefective = activities.filter(
-      (item) => normalize(item.status) === "defective"
-    ).length;
-
+    const n = (s?: string) => s?.toLowerCase() ?? "";
     return {
-      spare: countSpare,
-      deployed: countDeploy,
-      missing: countMissing,
-      dispose: countDispose,
-      lend: countLend,
-      defective: countDefective,
+      spare: activities.filter((i) => n(i.status) === "spare").length,
+      deployed: activities.filter((i) => n(i.status) === "deployed").length,
+      missing: activities.filter((i) => n(i.status) === "missing").length,
+      dispose: activities.filter((i) => n(i.status) === "dispose").length,
+      lend: activities.filter((i) => n(i.status) === "lend").length,
+      defective: activities.filter((i) => n(i.status) === "defective").length,
     };
   }, [activities]);
 
-  // Count asset_type occurrences for first chart
-  const assetTypeCounts: Record<string, number> = {};
-  activities.forEach(({ asset_type }) => {
-    assetTypeCounts[asset_type] = (assetTypeCounts[asset_type] ?? 0) + 1;
-  });
-  const assetTypeChartData = Object.entries(assetTypeCounts).map(([month, desktop]) => ({
-    month,
-    desktop,
-  }));
+  const assetTypeChartData = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    activities.forEach(({ asset_type }) => { map[asset_type] = (map[asset_type] ?? 0) + 1; });
+    return Object.entries(map).map(([month, desktop]) => ({ month, desktop }));
+  }, [activities]);
 
-  // Count brand occurrences for second chart
-  const brandCounts: Record<string, number> = {};
-  activities.forEach(({ brand }) => {
-    brandCounts[brand] = (brandCounts[brand] ?? 0) + 1;
-  });
-  const brandChartData = Object.entries(brandCounts).map(([month, desktop]) => ({
-    month,
-    desktop,
-  }));
+  const brandChartData = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    activities.forEach(({ brand }) => { map[brand] = (map[brand] ?? 0) + 1; });
+    return Object.entries(map).map(([month, desktop]) => ({ month, desktop }));
+  }, [activities]);
 
-  const locationCounts: Record<string, number> = {};
-  activities.forEach(({ location }) => {
-    locationCounts[location] = (locationCounts[location] ?? 0) + 1;
-  });
+  const locationCounts = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    activities.forEach(({ location }) => { map[location] = (map[location] ?? 0) + 1; });
+    return map;
+  }, [activities]);
 
   const expiredWarranties = React.useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-
     return activities.filter((item) => {
       if (!item.warranty_date) return false;
-
-      const warrantyDate = new Date(item.warranty_date);
-      warrantyDate.setHours(0, 0, 0, 0);
-
-      return warrantyDate < today; // expired if warranty date is before today
+      const d = new Date(item.warranty_date);
+      d.setHours(0, 0, 0, 0);
+      return d < today;
     });
   }, [activities]);
 
+  // ── Expired warranty table state ──────────────────────────────────────────
+  const [warrantySearch,       setWarrantySearch]       = useState("");
+  const [warrantyDisplayLimit, setWarrantyDisplayLimit] = useState(10);
 
+  const filteredExpired = React.useMemo(() => {
+    const q = warrantySearch.trim().toLowerCase();
+    if (!q) return expiredWarranties;
+    return expiredWarranties.filter((item) =>
+      [item.asset_tag, item.asset_type, item.brand, item.model, item.warranty_date]
+        .some((v) => v?.toLowerCase().includes(q))
+    );
+  }, [expiredWarranties, warrantySearch]);
 
+  // Reset limit when search changes
+  React.useEffect(() => { setWarrantyDisplayLimit(10); }, [warrantySearch]);
+
+  // ─────────────────────────────────────────────────────────────────────────
 
   return (
     <>
       <SidebarLeft />
-      <SidebarInset>
-        <header className="bg-background sticky top-0 flex h-14 shrink-0 items-center gap-2">
+      <SidebarInset className="overflow-hidden" style={{ backgroundColor: "#080c10", minHeight: "100%" }}>
+        <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 border-b-1" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
           <div className="flex flex-1 items-center gap-2 px-3">
             <SidebarTrigger />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="line-clamp-1">Dashboard</BreadcrumbPage>
+                  <BreadcrumbPage className="line-clamp-1 text-white">Dashboard</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
-        <main className="flex flex-col gap-4 p-4 overflow-auto">
-          {loadingUser ? (
-            <p>Loading user data...</p>
-          ) : errorUser ? (
-            <p className="text-red-600 font-semibold">{errorUser}</p>
-          ) : (
-            <>
-              {loadingActivities && <p>Loading activities...</p>}
-              {errorActivities && <p className="text-red-600 font-semibold">{errorActivities}</p>}
 
-              <div className="flex flex-col gap-4">
+        {/* ── Main content ── */}
+        <main
+          className="flex flex-col gap-4 p-4 overflow-auto font-mono"
+          style={{ backgroundColor: "#080c10", minHeight: "calc(100vh - 3.5rem)" }}
+        >
+          {/* Dot grid */}
+          <div
+            className="fixed inset-0 pointer-events-none"
+            style={{
+              backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+              zIndex: 0,
+            }}
+          />
+
+          <div className="relative z-10 flex flex-col gap-6">
+
+            {loadingUser ? (
+              <div className="flex items-center gap-2 py-10" style={{ color: "rgba(255,255,255,0.25)" }}>
+                <div className="w-3.5 h-3.5 border-t border-current rounded-full animate-spin" />
+                <span className="text-[9px] uppercase tracking-widest">LOADING USER...</span>
+              </div>
+            ) : errorUser ? (
+              <div className="flex items-center gap-2 p-4 text-[10px] border" style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.2)", backgroundColor: "rgba(248,113,113,0.04)" }}>
+                <TerminalDot color="#f87171" /> {errorUser}
+              </div>
+            ) : (
+              <>
+                {/* Loading / error for activities */}
+                {loadingActivities && (
+                  <div className="flex items-center gap-2" style={{ color: "rgba(255,255,255,0.25)" }}>
+                    <div className="w-3 h-3 border-t border-current rounded-full animate-spin" />
+                    <span className="text-[9px] uppercase tracking-widest">LOADING INVENTORY...</span>
+                  </div>
+                )}
+                {errorActivities && (
+                  <div className="flex items-center gap-2 p-3 text-[10px] border" style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.2)" }}>
+                    <TerminalDot color="#f87171" /> {errorActivities}
+                  </div>
+                )}
+
+                {/* ── Status cards ── */}
                 <StatusCard counts={counts} userId={userId ?? undefined} />
-              </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Asset Types Distribution */}
-                <AssetCard
-                  chartData={assetTypeChartData}
-                  title="Asset Types Distribution"
-                  description="Based on asset_type counts"
-                />
+                {/* ── Charts row ── */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <AssetCard
+                    chartData={assetTypeChartData}
+                    title="Asset Types Distribution"
+                    description="Based on asset_type counts"
+                  />
+                  <BrandCard
+                    chartData={brandChartData}
+                    title="Brand Distribution"
+                    description="Based on brand counts"
+                  />
+                </div>
 
-                {/* Brand Distribution */}
-                <BrandCard
-                  chartData={brandChartData}
-                  title="Brand Distribution"
-                  description="Based on brand counts"
-                />
+                {/* ── Location distribution ── */}
+                <div
+                  className="border flex flex-col"
+                  style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                >
+                  <div
+                    className="flex items-center gap-2 px-4 py-2.5 border-b"
+                    style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}
+                  >
+                    <TerminalDot color="#fbbf24" />
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>
+                      LOCATION DISTRIBUTION
+                    </span>
+                    <span
+                      className="ml-auto text-[9px] font-mono px-2 py-0.5 border"
+                      style={{ color: "#fbbf24", borderColor: "rgba(251,191,36,0.3)", backgroundColor: "rgba(251,191,36,0.06)" }}
+                    >
+                      {Object.keys(locationCounts).length} LOCATIONS
+                    </span>
+                  </div>
 
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Location Distribution</CardTitle>
-                    <CardDescription>Count of items grouped by location</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="flex flex-col gap-2">
-                      {Object.entries(locationCounts).map(([location, count]) => (
-                        <Item key={location}>
-                          <Separator />
-                          <ItemContent>
-                            <div className="flex justify-between items-center w-full">
-                              <ItemTitle className="flex-1 text-left">{location}</ItemTitle>
-                              <ItemDescription className="flex-none">
-                                <Badge className="h-8 min-w-[2rem] rounded-full px-2 font-mono tabular-nums">{count}</Badge>
-                              </ItemDescription>
-                            </div>
-                          </ItemContent>
-                        </Item>
-                      ))}
-                      {Object.keys(locationCounts).length === 0 && (
-                        <p className="text-muted-foreground">No location data available.</p>
-                      )}
+                  {Object.keys(locationCounts).length === 0 ? (
+                    <div className="flex items-center justify-center py-10">
+                      <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                        NO LOCATION DATA
+                      </span>
                     </div>
-                  </CardContent>
-                </Card>
+                  ) : (
+                    <div className="p-4 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-2">
+                      {Object.entries(locationCounts)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([location, count]) => (
+                          <div
+                            key={location}
+                            className="flex items-center justify-between px-3 py-2 border"
+                            style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                          >
+                            <span className="text-[10px] truncate pr-2" style={{ color: "rgba(255,255,255,0.55)" }}>
+                              {location || "—"}
+                            </span>
+                            <span
+                              className="text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 border"
+                              style={{ color: "#fbbf24", borderColor: "rgba(251,191,36,0.25)", backgroundColor: "rgba(251,191,36,0.06)" }}
+                            >
+                              {count}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
 
-                <Card className="mt-6">
-                  <CardHeader>
-                    <CardTitle>Out of Warranty / Expired Items</CardTitle>
-                    <CardDescription>Items with expired warranty dates</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    {expiredWarranties.length === 0 ? (
-                      <p className="text-muted-foreground">No expired warranty items.</p>
-                    ) : (
-                      <Table className="text-xs">
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Asset Tag</TableHead>
-                            <TableHead>Asset Type</TableHead>
-                            <TableHead>Brand</TableHead>
-                            <TableHead>Model</TableHead>
-                            <TableHead>Warranty Date</TableHead>
-                            <TableHead>Status</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {expiredWarranties.map((item) => (
-                            <TableRow key={item.id} className="odd:bg-white even:bg-gray-50">
-                              <TableCell>{item.asset_tag || "-"}</TableCell>
-                              <TableCell>{item.asset_type || "-"}</TableCell>
-                              <TableCell>{item.brand || "-"}</TableCell>
-                              <TableCell>{item.model || "-"}</TableCell>
-                              <TableCell>
-                                {item.warranty_date
-                                  ? new Date(item.warranty_date).toLocaleDateString()
-                                  : "-"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="destructive" className="capitalize">
-                                  Expired
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
+                {/* ── Expired warranty table ── */}
+                <div
+                  className="border flex flex-col"
+                  style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                >
+                  {/* Panel header */}
+                  <div
+                    className="flex items-center gap-2 px-4 py-2.5 border-b"
+                    style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}
+                  >
+                    <TerminalDot color="#f87171" />
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>
+                      OUT OF WARRANTY / EXPIRED
+                    </span>
+                    <span
+                      className="ml-auto text-[9px] font-mono px-2 py-0.5 border"
+                      style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)", backgroundColor: "rgba(248,113,113,0.06)" }}
+                    >
+                      {filteredExpired.length} / {expiredWarranties.length} ITEMS
+                    </span>
+                  </div>
+
+                  {/* Search bar */}
+                  <div
+                    className="flex items-center gap-2 px-4 py-2.5 border-b"
+                    style={{ borderColor: "rgba(255,255,255,0.05)", backgroundColor: "rgba(0,0,0,0.15)" }}
+                  >
+                    <span className="text-[10px] font-mono select-none" style={{ color: "rgba(255,255,255,0.25)" }}>›</span>
+                    <input
+                      type="search"
+                      placeholder="SEARCH EXPIRED..."
+                      value={warrantySearch}
+                      onChange={(e) => setWarrantySearch(e.target.value)}
+                      className="flex-1 bg-transparent outline-none text-[10px] font-mono uppercase tracking-widest placeholder:opacity-30"
+                      style={{ color: "rgba(255,255,255,0.6)" }}
+                    />
+                    {warrantySearch && (
+                      <button
+                        onClick={() => setWarrantySearch("")}
+                        className="text-[9px] font-mono uppercase tracking-widest"
+                        style={{ color: "rgba(255,255,255,0.25)" }}
+                      >
+                        CLEAR
+                      </button>
                     )}
-                  </CardContent>
-                </Card>
+                  </div>
 
-              </div>
-            </>
-          )}
+                  {/* Table */}
+                  {expiredWarranties.length === 0 ? (
+                    <div className="flex items-center justify-center py-10">
+                      <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                        NO EXPIRED WARRANTIES
+                      </span>
+                    </div>
+                  ) : filteredExpired.length === 0 ? (
+                    <div className="flex items-center justify-center py-10">
+                      <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                        NO RESULTS FOR "{warrantySearch.toUpperCase()}"
+                      </span>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse" style={{ minWidth: "700px" }}>
+                          <thead>
+                            <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                              <THead>Asset Tag</THead>
+                              <THead>Type</THead>
+                              <THead>Brand</THead>
+                              <THead>Model</THead>
+                              <THead>Warranty Date</THead>
+                              <THead>Status</THead>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredExpired.slice(0, warrantyDisplayLimit).map((item, idx) => (
+                              <tr
+                                key={item.id}
+                                style={{
+                                  backgroundColor: idx % 2 === 0
+                                    ? "transparent"
+                                    : "rgba(255,255,255,0.012)",
+                                }}
+                              >
+                                <TCell mono>{item.asset_tag}</TCell>
+                                <TCell>{item.asset_type}</TCell>
+                                <TCell>{item.brand}</TCell>
+                                <TCell>{item.model}</TCell>
+                                <TCell mono>
+                                  {item.warranty_date
+                                    ? new Date(item.warranty_date).toLocaleDateString(undefined, {
+                                        year: "numeric", month: "short", day: "numeric",
+                                      })
+                                    : undefined}
+                                </TCell>
+                                <td
+                                  className="px-3 py-2.5 whitespace-nowrap"
+                                  style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                                >
+                                  <span
+                                    className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border font-mono"
+                                    style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)", backgroundColor: "rgba(248,113,113,0.08)" }}
+                                  >
+                                    EXPIRED
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Load more / footer */}
+                      <div
+                        className="flex items-center justify-between px-4 py-2.5 border-t"
+                        style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.2)" }}
+                      >
+                        <span className="text-[9px] font-mono uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                          SHOWING {Math.min(warrantyDisplayLimit, filteredExpired.length)} OF {filteredExpired.length}
+                        </span>
+                        {warrantyDisplayLimit < filteredExpired.length && (
+                          <button
+                            onClick={() => setWarrantyDisplayLimit((prev) => prev + 10)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border font-mono transition-all duration-150 cursor-pointer"
+                            style={{ color: "#f87171", borderColor: "rgba(248,113,113,0.3)", backgroundColor: "rgba(248,113,113,0.05)" }}
+                          >
+                            LOAD MORE (+10)
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </main>
       </SidebarInset>
+
       <SidebarRight
         userId={userId ?? undefined}
         dateCreatedFilterRange={dateCreatedFilterRange}
@@ -416,6 +492,8 @@ function DashboardContent() {
     </>
   );
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function Page() {
   return (

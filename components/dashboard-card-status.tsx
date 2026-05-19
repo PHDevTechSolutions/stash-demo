@@ -1,144 +1,129 @@
 "use client";
 
 import React from "react";
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
-  CardFooter,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
 
 interface StatusCardProps {
-  counts: Record<string, number>;
-  userId?: string;
+    counts: Record<string, number>;
+    userId?: string;
 }
 
-const statusMeta: Record<
-  string,
-  { title: string; description: string; link: string; linkLabel: string }
-> = {
-  spare: {
-    title: "Spare",
-    description:
-      "Available IT equipments and devices that are ready for deployment or replacement.",
-    link: "/asset/spare",
-    linkLabel: "View Spare",
-  },
-  deployed: {
-    title: "Deployed",
-    description:
-      "IT equipments and devices currently assigned and actively used by users or departments.",
-    link: "/asset/deployed",
-    linkLabel: "View Deployed",
-  },
-  missing: {
-    title: "Missing",
-    description:
-      "IT equipments and devices that are unaccounted for and require investigation or reporting.",
-    link: "/asset/missing",
-    linkLabel: "View Missing",
-  },
-  dispose: {
-    title: "Disposed",
-    description:
-      "IT equipments and devices that are marked for disposal, recycling, or decommissioning.",
-    link: "/asset/disposal",
-    linkLabel: "View Disposed",
-  },
-  lend: {
-    title: "Lend",
-    description:
-      "IT equipments and devices currently lent out to users or departments temporarily.",
-    link: "/asset/lend",
-    linkLabel: "View Lend",
-  },
-  defective: {
-    title: "Defective",
-    description:
-      "IT equipments and devices that are malfunctioning and need repair or replacement.",
-    link: "/asset/defective",
-    linkLabel: "View Defective",
-  },
+const statusMeta: Record<string, { title: string; description: string; link: string; color: string; dot: string }> = {
+    spare: {
+        title: "SPARE",
+        description: "Available assets ready for deployment or replacement.",
+        link: "/asset/spare",
+        color: "#34d399",
+        dot: "#34d399",
+    },
+    deployed: {
+        title: "DEPLOYED",
+        description: "Assets currently assigned and actively used.",
+        link: "/asset/deployed",
+        color: "#38bdf8",
+        dot: "#38bdf8",
+    },
+    missing: {
+        title: "MISSING",
+        description: "Assets unaccounted for and requiring investigation.",
+        link: "/asset/missing",
+        color: "#fbbf24",
+        dot: "#fbbf24",
+    },
+    dispose: {
+        title: "DISPOSED",
+        description: "Assets marked for disposal or decommissioning.",
+        link: "/asset/disposal",
+        color: "rgba(255,255,255,0.35)",
+        dot: "rgba(255,255,255,0.3)",
+    },
+    lend: {
+        title: "LEND",
+        description: "Assets temporarily lent out to users or departments.",
+        link: "/asset/lend",
+        color: "#a78bfa",
+        dot: "#a78bfa",
+    },
+    defective: {
+        title: "DEFECTIVE",
+        description: "Assets that are malfunctioning and need repair.",
+        link: "/asset/defective",
+        color: "#f87171",
+        dot: "#f87171",
+    },
 };
 
+const termBtn =
+    "inline-flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest border font-mono transition-all duration-150 cursor-pointer";
+
 export function StatusCard({ counts, userId }: StatusCardProps) {
-  const grandTotal = Object.values(counts).reduce(
-    (sum, value) => sum + value,
-    0
-  );
+    const grandTotal = Object.values(counts).reduce((sum, v) => sum + v, 0);
 
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      {/* ALL ASSETS CARD */}
-      <Card className="flex flex-col justify-between border-primary md:col-span-2">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold">All Assets</CardTitle>
-          <CardDescription>
-            Total number of all IT assets regardless of status.
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="flex items-center justify-between font-semibold">
-          <span>
-            {grandTotal === 0 ? "No items" : `Total ${grandTotal} items`}
-          </span>
-
-          <Badge className="h-9 min-w-[2.5rem] rounded-full px-3 text-base font-mono">
-            {grandTotal}
-          </Badge>
-        </CardContent>
-
-        <Separator />
-
-        <CardFooter className="flex justify-end">
-          <Button variant="outline" asChild>
-            <a href={`/asset/all?id=${encodeURIComponent(userId ?? "")}`}>
-              View All
-            </a>
-          </Button>
-        </CardFooter>
-      </Card>
-
-      {/* PER STATUS CARDS */}
-      {Object.keys(statusMeta).map((status) => {
-        const meta = statusMeta[status];
-        const total = counts[status] ?? 0;
-
-        return (
-          <Card
-            key={status}
-            className="flex flex-col justify-between md:col-span-1"
-          >
-            <CardHeader>
-              <CardTitle className="text-lg font-semibold">{meta.title}</CardTitle>
-              <CardDescription>{meta.description}</CardDescription>
-            </CardHeader>
-
-            <CardContent className="flex items-center justify-between font-semibold">
-              <span>{total === 0 ? "No items" : `Total ${total} items`}</span>
-
-              <Badge className="h-8 min-w-[2rem] rounded-full px-2 font-mono tabular-nums">
-                {total}
-              </Badge>
-            </CardContent>
-
-            <Separator />
-
-            <CardFooter className="flex justify-end">
-              <Button variant="outline" asChild>
-                <a href={`${meta.link}?id=${encodeURIComponent(userId ?? "")}`}>
-                  {meta.linkLabel}
+    return (
+        <div className="flex flex-col gap-4">
+            {/* ── All Assets banner ── */}
+            <div
+                className="flex items-center justify-between px-5 py-4 border"
+                style={{ borderColor: "rgba(255,255,255,0.1)", backgroundColor: "rgba(255,255,255,0.02)" }}
+            >
+                <div className="flex flex-col gap-1">
+                    <span className="text-[9px] uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.3)" }}>
+                        TOTAL ASSETS
+                    </span>
+                    <span className="text-3xl font-mono font-bold" style={{ color: "rgba(255,255,255,0.85)" }}>
+                        {grandTotal}
+                    </span>
+                    <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.25)" }}>
+                        All IT assets regardless of status
+                    </span>
+                </div>
+                <a
+                    href={`/asset/all?id=${encodeURIComponent(userId ?? "")}`}
+                    className={termBtn}
+                    style={{ color: "rgba(255,255,255,0.5)", borderColor: "rgba(255,255,255,0.12)" }}
+                >
+                    VIEW ALL
                 </a>
-              </Button>
-            </CardFooter>
-          </Card>
-        );
-      })}
-    </div>
-  );
+            </div>
+
+            {/* ── Per-status grid ── */}
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+                {Object.keys(statusMeta).map((status) => {
+                    const meta = statusMeta[status];
+                    const total = counts[status] ?? 0;
+                    return (
+                        <div
+                            key={status}
+                            className="flex flex-col justify-between p-4 border"
+                            style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                        >
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center gap-2">
+                                    <span
+                                        className="inline-flex w-1.5 h-1.5 rounded-full shrink-0"
+                                        style={{ backgroundColor: meta.dot, boxShadow: `0 0 5px ${meta.dot}` }}
+                                    />
+                                    <span className="text-[9px] uppercase tracking-widest font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>
+                                        {meta.title}
+                                    </span>
+                                </div>
+                                <span className="text-2xl font-mono font-bold" style={{ color: meta.color }}>
+                                    {total}
+                                </span>
+                                <span className="text-[9px] leading-relaxed" style={{ color: "rgba(255,255,255,0.2)" }}>
+                                    {meta.description}
+                                </span>
+                            </div>
+                            <a
+                                href={`${meta.link}?id=${encodeURIComponent(userId ?? "")}`}
+                                className="mt-4 text-[9px] uppercase tracking-widest font-mono border-b pb-0.5 w-fit transition-opacity hover:opacity-70"
+                                style={{ color: meta.color, borderColor: meta.color }}
+                            >
+                                VIEW →
+                            </a>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
 }
