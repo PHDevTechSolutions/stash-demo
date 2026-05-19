@@ -137,7 +137,7 @@ export function routeItem(item: InventoryItem): RoutedItemColumns {
 
     const brandModel = `${item.brand ?? ""} ${item.model ?? ""}`.trim();
     const amount = item.amount
-        ? `₱ ${Number(item.amount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
+        ? Number(item.amount).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         : "";
 
     if (assetType === "MONITOR") {
