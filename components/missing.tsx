@@ -398,7 +398,6 @@ export const Missing: React.FC<TicketProps> = ({
                             setOpen={setFilterSheetOpen}
                             filters={filters}
                             setFilters={setFilters}
-                            handleFilterChange={handleFilterChange}
                             resetFilters={resetFilters}
                             applyFilters={applyFilters}
                         />
