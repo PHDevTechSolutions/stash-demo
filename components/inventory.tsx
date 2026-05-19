@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircleIcon, CheckCircle2Icon } from "lucide-react";
+import { AlertCircleIcon, CheckCircle2Icon, DownloadCloud, Trash2Icon, Printer, Plus, UploadCloud, ArchiveIcon, Filter } from "lucide-react";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,32 +30,8 @@ import {
 import { InventoryDialog } from "@/components/inventory-dialog";
 import { InventoryFilterDialog } from "@/components/inventory-filter-dialog";
 import { supabase } from "@/utils/supabase";
-
-interface InventoryItem {
-    id: string; // supabase id
-    referenceid: string;
-    asset_tag?: string;
-    asset_type?: string;
-    status: string;
-    location?: string;
-    new_user?: string;
-    old_user?: string;
-    department?: string;
-    position?: string;
-    brand?: string;
-    model?: string;
-    processor?: string;
-    ram?: string;
-    storage?: string;
-    serial_number?: string;
-    purchase_date?: string;
-    warranty_date?: string;
-    asset_age?: string;
-    amount?: string;
-    remarks?: string;
-    mac_address?: string;
-    date_created?: string;
-}
+import { type InventoryItem } from "@/types/inventory";
+import { generateBulkAccountabilityPDF, groupSelectedItems } from "@/utils/generate-bulk-accountability-pdf";
 
 type InventoryFilters = {
     status: string;
@@ -129,6 +105,8 @@ export const Inventory: React.FC<TicketProps> = ({
 
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+    const [isPdfGenerating, setIsPdfGenerating] = useState(false);
+    const [printCompany, setPrintCompany] = useState<"ecoshift" | "disruptive">("ecoshift");
 
     const [filters, setFilters] = useState<InventoryFilters>({
         status: "",
@@ -351,6 +329,11 @@ export const Inventory: React.FC<TicketProps> = ({
         return filteredActivities.length;
     }, [filteredActivities]);
 
+    const showPrintButton = selectedIds.size > 0 && [...selectedIds].some(id => {
+        const item = activities.find(a => a.id === id);
+        return !!item?.new_user?.trim();
+    });
+
     const pageCount = Math.ceil(filteredActivities.length / pageSize);
 
     const paginatedActivities = useMemo(() => {
@@ -504,6 +487,32 @@ export const Inventory: React.FC<TicketProps> = ({
     async function handleDeleteSelected() {
         if (selectedIds.size === 0) return;
         setConfirmDeleteOpen(true);
+    }
+
+    async function handlePrintBulk() {
+        // Guard: do nothing if nothing is selected
+        if (selectedIds.size === 0) return;
+
+        // Collect the selected InventoryItem objects
+        const selectedItems = activities.filter(a => selectedIds.has(a.id));
+
+        // Group by employee
+        const groups = groupSelectedItems(selectedItems);
+
+        // If every group is "Unknown" there are no valid employees — show error and bail
+        if (groups.every(g => g.new_user === "Unknown")) {
+            toast.error("None of the selected items have a valid employee name.");
+            return;
+        }
+
+        setIsPdfGenerating(true);
+        try {
+            await generateBulkAccountabilityPDF(groups, printCompany);
+        } catch {
+            toast.error("Failed to generate PDF");
+        } finally {
+            setIsPdfGenerating(false);
+        }
     }
 
     async function confirmDeletion() {
@@ -777,14 +786,22 @@ export const Inventory: React.FC<TicketProps> = ({
                         />
 
                         <Button onClick={handleDownloadCSV} variant="outline">
-                            Download CSV
+                            <DownloadCloud /> Export
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            className="max-w-sm"
+                            onClick={() => setBulkOpen(true)}
+                        >
+                           <UploadCloud /> Bulk Import
                         </Button>
                     </div>
 
                     {/* Actions */}
                     <div className="flex flex-wrap gap-2 items-center">
-                        <p className="font-semibold">Total Assets ( Except Dispose Item ):</p>
-                        <Badge className="bg-green-600 text-white py-2 px-4 text-sm">
+                        <p className="font-semibold text-xs">Total Assets ( Except Dispose Item ):</p>
+                        <Badge className="bg-green-600 text-white py-1 px-2 text-xs">
                             {totalSpareCount}
                         </Badge>
 
@@ -794,8 +811,29 @@ export const Inventory: React.FC<TicketProps> = ({
                                 className="w-full sm:w-auto"
                                 onClick={handleDeleteSelected}
                             >
-                                Delete Selected ({selectedIds.size})
+                                <Trash2Icon /> ({selectedIds.size})
                             </Button>
+                        )}
+
+                        {showPrintButton && (
+                            <div className="flex items-center gap-1 w-full sm:w-auto">
+                                <select
+                                    value={printCompany}
+                                    onChange={(e) => setPrintCompany(e.target.value as "ecoshift" | "disruptive")}
+                                    disabled={isPdfGenerating}
+                                    className="h-9 rounded-md border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                                >
+                                    <option value="ecoshift">Ecoshift</option>
+                                    <option value="disruptive">Disruptive</option>
+                                </select>
+                                <Button
+                                    className="w-full sm:w-auto"
+                                    onClick={handlePrintBulk}
+                                    disabled={isPdfGenerating}
+                                >
+                                  <Printer />  {isPdfGenerating ? "Generating PDF..." : "Print"}
+                                </Button>
+                            </div>
                         )}
 
                         <Button
@@ -805,15 +843,7 @@ export const Inventory: React.FC<TicketProps> = ({
                                 setOpen(true);
                             }}
                         >
-                            Add New
-                        </Button>
-
-                        <Button
-                            variant="outline"
-                            className="w-full sm:w-auto"
-                            onClick={() => setBulkOpen(true)}
-                        >
-                            Bulk Upload
+                           <Plus /> Add New
                         </Button>
 
                         {hasOldItems && (
@@ -826,7 +856,7 @@ export const Inventory: React.FC<TicketProps> = ({
                                 }}
                                 disabled={updatingOldItems}
                             >
-                                {updatingOldItems ? "Updating Old Items..." : "Update Old Items to Dispose"}
+                               <ArchiveIcon /> {updatingOldItems ? "Updating Old Items..." : "Dispose"}
                             </Button>
                         )}
 
