@@ -24,6 +24,7 @@ import { supabase } from "@/utils/supabase";
 import { StatusCard } from "@/components/dashboard-card-status";
 import { AssetCard } from "@/components/dashboard-card-asset_type";
 import { BrandCard } from "@/components/dashboard-card-brand";
+import { Globe, Bell } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -37,6 +38,13 @@ interface InventoryItem {
   location: string;
   date_created?: string;
   warranty_date: string;
+}
+
+interface DomainItem {
+  domain: string;
+  status: string;
+  expires: string; // Unified expiration field
+  source: "godaddy" | "hostinger";
 }
 
 interface UserDetails {
@@ -90,6 +98,9 @@ function DashboardContent() {
   const [errorUser, setErrorUser] = useState<string | null>(null);
   const [userDetails, setUserDetails] = useState<UserDetails>({ referenceid: "" });
 
+  const [domains, setDomains] = useState<DomainItem[]>([]);
+  const [loadingDomains, setLoadingDomains] = useState(false);
+
   const queryUserId = searchParams?.get("id") ?? "";
 
   useEffect(() => {
@@ -132,9 +143,95 @@ function DashboardContent() {
       .finally(() => setLoadingActivities(false));
   }, [referenceid]);
 
+  const fetchDomains = useCallback(async () => {
+    setLoadingDomains(true);
+    try {
+      const [gdRes, hostRes] = await Promise.all([
+        fetch("/api/godaddy-domains"),
+        fetch("/api/hostinger-domains")
+      ]);
+
+      let gdData: DomainItem[] = [];
+      let hostData: DomainItem[] = [];
+
+      if (gdRes.ok) {
+        const raw = await gdRes.json();
+        gdData = raw.map((d: any) => ({
+          domain: d.domain,
+          status: d.status,
+          expires: d.expires,
+          source: "godaddy"
+        }));
+      }
+
+      if (hostRes.ok) {
+        const raw = await hostRes.json();
+        hostData = raw.map((d: any) => ({
+          domain: d.domain || d.domain_name,
+          status: d.status,
+          expires: d.expires_at || d.expires || d.expiration_date,
+          source: "hostinger"
+        }));
+      }
+
+      const allDomains = [...gdData, ...hostData].sort((a, b) => 
+        new Date(a.expires).getTime() - new Date(b.expires).getTime()
+      );
+      setDomains(allDomains);
+
+      // ── Notifications ──
+      const today = new Date();
+      const expiringDomains: any[] = [];
+
+      allDomains.forEach(d => {
+        if (!d.expires) return;
+        const expiryDate = new Date(d.expires);
+        const diffDays = Math.ceil((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (diffDays <= 30 && diffDays > 0) {
+          expiringDomains.push({ ...d, diffDays, isCritical: diffDays <= 14 });
+          
+          if (diffDays <= 14) {
+            toast.error(`DOMAIN EXPIRING SOON: ${d.domain} expires in ${diffDays} days! (${d.source.toUpperCase()})`, {
+              duration: 10000,
+              icon: <Bell className="h-4 w-4" />
+            });
+          } else {
+            toast.warning(`DOMAIN RENEWAL: ${d.domain} expires in ${diffDays} days. (${d.source.toUpperCase()})`, {
+              duration: 8000,
+              icon: <Bell className="h-4 w-4" />
+            });
+          }
+        }
+      });
+
+      // Send email if there are expiring domains
+      if (expiringDomains.length > 0) {
+        // Load custom emails from localStorage
+        const savedEmails = localStorage.getItem("domain_notification_emails");
+        const customEmails = savedEmails ? JSON.parse(savedEmails) : [];
+
+        fetch("/api/send-domain-alert", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            domains: expiringDomains,
+            customEmails: customEmails
+          })
+        }).catch(err => console.error("Failed to trigger email alert:", err));
+      }
+
+    } catch (err) {
+      console.error("Error fetching domains:", err);
+    } finally {
+      setLoadingDomains(false);
+    }
+  }, []);
+
   // ── Realtime ──────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchActivities();
+    fetchDomains();
     if (!referenceid) return;
     const ch = supabase
       .channel(`inventory-${referenceid}`)
@@ -278,6 +375,100 @@ function DashboardContent() {
 
                 {/* ── Status cards ── */}
                 <StatusCard counts={counts} userId={userId ?? undefined} />
+
+                {/* ── Domain Monitoring Card ── */}
+                <div
+                  className="border flex flex-col"
+                  style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}
+                >
+                  <div
+                    className="flex items-center gap-2 px-4 py-2.5 border-b"
+                    style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}
+                  >
+                    <TerminalDot color="#34d399" />
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>
+                      DOMAIN EXPIRATION MONITORING
+                    </span>
+                    <Globe className="ml-auto h-3.5 w-3.5 opacity-30" />
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    {loadingDomains ? (
+                      <div className="flex items-center justify-center py-10 gap-2">
+                        <div className="w-3 h-3 border-t border-current rounded-full animate-spin" />
+                        <span className="text-[9px] uppercase tracking-widest opacity-30">SCANNING REGISTRARS...</span>
+                      </div>
+                    ) : domains.length === 0 ? (
+                      <div className="flex items-center justify-center py-10">
+                        <span className="text-[9px] uppercase tracking-widest opacity-20">NO DOMAIN DATA FOUND</span>
+                      </div>
+                    ) : (
+                      <table className="w-full border-collapse" style={{ minWidth: "600px" }}>
+                        <thead>
+                          <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                            <THead>Domain</THead>
+                            <THead>Registrar</THead>
+                            <THead>Status</THead>
+                            <THead>Expiration</THead>
+                            <THead>Time Left</THead>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {domains.slice(0, 5).map((item, idx) => {
+                            const diffDays = Math.ceil((new Date(item.expires).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                            const isUrgent = diffDays <= 30;
+                            const isCritical = diffDays <= 14;
+
+                            return (
+                              <tr
+                                key={item.domain}
+                                style={{
+                                  backgroundColor: idx % 2 === 0
+                                    ? "transparent"
+                                    : "rgba(255,255,255,0.012)",
+                                }}
+                              >
+                                <TCell>
+                                  <span className="font-bold text-white/80">{item.domain}</span>
+                                </TCell>
+                                <TCell>
+                                  <span className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border border-white/10 bg-white/5">
+                                    {item.source}
+                                  </span>
+                                </TCell>
+                                <TCell>
+                                  <span
+                                    className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border"
+                                    style={{
+                                      color: item.status.toLowerCase() === "active" ? "#34d399" : "#f87171",
+                                      borderColor: item.status.toLowerCase() === "active" ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)",
+                                      backgroundColor: item.status.toLowerCase() === "active" ? "rgba(52,211,153,0.06)" : "rgba(248,113,113,0.06)",
+                                    }}
+                                  >
+                                    {item.status}
+                                  </span>
+                                </TCell>
+                                <TCell mono>
+                                  {new Date(item.expires).toLocaleDateString(undefined, {
+                                    year: "numeric", month: "short", day: "numeric",
+                                  })}
+                                </TCell>
+                                <TCell>
+                                  <span 
+                                    className="font-mono font-bold"
+                                    style={{ color: isCritical ? "#f87171" : isUrgent ? "#fbbf24" : "inherit" }}
+                                  >
+                                    {diffDays} DAYS
+                                  </span>
+                                </TCell>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                </div>
 
                 {/* ── Charts row ── */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

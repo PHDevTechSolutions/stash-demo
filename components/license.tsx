@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import { Plus, Trash2, Pencil, ChevronLeft, ChevronRight, ClipboardList } from "lucide-react";
+import { Plus, Trash2, Pencil, ChevronLeft, ChevronRight, ClipboardList, Globe } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { type DateRange } from "react-day-picker";
 import { toast } from "sonner";
@@ -23,6 +23,23 @@ interface LicenseItem {
     asset_age?: string;
     remarks?: string;
     date_created?: string;
+}
+
+interface GoDaddyDomain {
+    domain: string;
+    status: string;
+    expires: string;
+    renewAuto: boolean;
+    renewable: boolean;
+    domainId: string;
+}
+
+interface HostingerDomain {
+    domain: string;
+    status: string;
+    expires_at: string;
+    auto_renew: boolean;
+    id: string;
 }
 
 interface LicenseProps {
@@ -83,9 +100,18 @@ const termBtn =
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilterRange }) => {
+    const [viewMode, setViewMode] = useState<"licenses" | "godaddy" | "hostinger">("licenses");
     const [activities,        setActivities]        = useState<LicenseItem[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(false);
     const [errorActivities,   setErrorActivities]   = useState<string | null>(null);
+
+    const [domains, setDomains] = useState<GoDaddyDomain[]>([]);
+    const [loadingDomains, setLoadingDomains] = useState(false);
+    const [errorDomains, setErrorDomains] = useState<string | null>(null);
+
+    const [hostingerDomains, setHostingerDomains] = useState<HostingerDomain[]>([]);
+    const [loadingHostinger, setLoadingHostinger] = useState(false);
+    const [errorHostinger, setErrorHostinger] = useState<string | null>(null);
 
     const [page,   setPage]   = useState(1);
     const [search, setSearch] = useState("");
@@ -129,9 +155,47 @@ export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilter
         }
     }, [referenceid]);
 
+    const fetchDomains = useCallback(async () => {
+        setLoadingDomains(true);
+        setErrorDomains(null);
+        try {
+            const response = await fetch("/api/godaddy-domains");
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Failed to fetch domains");
+            setDomains(data || []);
+        } catch (error: any) {
+            setErrorDomains(error.message || "Error fetching domains");
+            toast.error(error.message || "Error fetching domains");
+        } finally {
+            setLoadingDomains(false);
+        }
+    }, []);
+
+    const fetchHostingerDomains = useCallback(async () => {
+        setLoadingHostinger(true);
+        setErrorHostinger(null);
+        try {
+            const response = await fetch("/api/hostinger-domains");
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || "Failed to fetch domains");
+            setHostingerDomains(data || []);
+        } catch (error: any) {
+            setErrorHostinger(error.message || "Error fetching domains");
+            toast.error(error.message || "Error fetching domains");
+        } finally {
+            setLoadingHostinger(false);
+        }
+    }, []);
+
     // ── Realtime ──────────────────────────────────────────────────────────────
     useEffect(() => {
         fetchActivities();
+        if (viewMode === "godaddy") {
+            fetchDomains();
+        }
+        if (viewMode === "hostinger") {
+            fetchHostingerDomains();
+        }
         if (!referenceid) return;
         const ch = supabase
             .channel(`public:license:referenceid=eq.${referenceid}`)
@@ -186,11 +250,52 @@ export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilter
         });
     }, [activities, search, dateCreatedFilterRange]);
 
-    const pageCount = Math.ceil(filteredActivities.length / PAGE_SIZE);
+    const filteredDomains = useMemo(() => {
+        return domains.filter((item) => {
+            if (
+                search.trim() &&
+                !Object.values(item).some((v) =>
+                    v?.toString().toLowerCase().includes(search.toLowerCase())
+                )
+            )
+                return false;
+            return true;
+        });
+    }, [domains, search]);
+
+    const filteredHostingerDomains = useMemo(() => {
+        return hostingerDomains.filter((item) => {
+            if (
+                search.trim() &&
+                !Object.values(item).some((v) =>
+                    v?.toString().toLowerCase().includes(search.toLowerCase())
+                )
+            )
+                return false;
+            return true;
+        });
+    }, [hostingerDomains, search]);
+
+    const pageCount = viewMode === "licenses" 
+        ? Math.ceil(filteredActivities.length / PAGE_SIZE)
+        : viewMode === "godaddy"
+        ? Math.ceil(filteredDomains.length / PAGE_SIZE)
+        : Math.ceil(filteredHostingerDomains.length / PAGE_SIZE);
+
     const paginatedActivities = useMemo(() => {
         const s = (page - 1) * PAGE_SIZE;
         return filteredActivities.slice(s, s + PAGE_SIZE);
     }, [filteredActivities, page]);
+
+    const paginatedDomains = useMemo(() => {
+        const s = (page - 1) * PAGE_SIZE;
+        return filteredDomains.slice(s, s + PAGE_SIZE);
+    }, [filteredDomains, page]);
+
+    const paginatedHostingerDomains = useMemo(() => {
+        const s = (page - 1) * PAGE_SIZE;
+        return filteredHostingerDomains.slice(s, s + PAGE_SIZE);
+    }, [filteredHostingerDomains, page]);
 
     // ── Form handlers ─────────────────────────────────────────────────────────
     function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -325,23 +430,68 @@ export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilter
                     className="flex items-center justify-between px-4 py-2.5 border"
                     style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.02)" }}
                 >
-                    <div className="flex items-center gap-3">
-                        <TerminalDot color="#34d399" />
-                        <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>
-                            LICENSE MANAGEMENT
-                        </span>
-                        <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
-                            / {referenceid}
-                        </span>
+                    <div className="flex items-center gap-6">
+                        <div className="flex items-center gap-3">
+                            <TerminalDot color="#34d399" />
+                            <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>
+                                {viewMode === "licenses" ? "LICENSE MANAGEMENT" : viewMode === "godaddy" ? "GODADDY DOMAINS" : "HOSTINGER DOMAINS"}
+                            </span>
+                            <span className="text-[10px]" style={{ color: "rgba(255,255,255,0.2)" }}>
+                                / {referenceid}
+                            </span>
+                        </div>
+
+                        {/* Tab Switcher */}
+                        <div className="flex items-center bg-black/40 border border-white/5 p-0.5">
+                            <button
+                                onClick={() => { setViewMode("licenses"); setPage(1); }}
+                                className={`px-3 py-1 text-[9px] uppercase tracking-widest transition-all ${
+                                    viewMode === "licenses"
+                                        ? "bg-white/10 text-emerald-400 font-bold"
+                                        : "text-white/40 hover:text-white/60"
+                                }`}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <ClipboardList className="h-3 w-3" />
+                                    LICENSES
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => { setViewMode("godaddy"); setPage(1); fetchDomains(); }}
+                                className={`px-3 py-1 text-[9px] uppercase tracking-widest transition-all ${
+                                    viewMode === "godaddy"
+                                        ? "bg-white/10 text-emerald-400 font-bold"
+                                        : "text-white/40 hover:text-white/60"
+                                }`}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <Globe className="h-3 w-3" />
+                                    GODADDY
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => { setViewMode("hostinger"); setPage(1); fetchHostingerDomains(); }}
+                                className={`px-3 py-1 text-[9px] uppercase tracking-widest transition-all ${
+                                    viewMode === "hostinger"
+                                        ? "bg-white/10 text-emerald-400 font-bold"
+                                        : "text-white/40 hover:text-white/60"
+                                }`}
+                            >
+                                <div className="flex items-center gap-1.5">
+                                    <Globe className="h-3 w-3" />
+                                    HOSTINGER
+                                </div>
+                            </button>
+                        </div>
                     </div>
                     <div className="flex items-center gap-3">
                         <span
                             className="text-[9px] uppercase tracking-widest px-2 py-0.5 border font-mono"
                             style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)", backgroundColor: "rgba(52,211,153,0.06)" }}
                         >
-                            {filteredActivities.length} RECORDS
+                            {viewMode === "licenses" ? filteredActivities.length : viewMode === "godaddy" ? filteredDomains.length : filteredHostingerDomains.length} RECORDS
                         </span>
-                        {selectedIds.size > 0 && (
+                        {viewMode === "licenses" && selectedIds.size > 0 && (
                             <button
                                 onClick={() => setConfirmDeleteOpen(true)}
                                 className={termBtn}
@@ -351,14 +501,46 @@ export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilter
                                 DELETE ({selectedIds.size})
                             </button>
                         )}
-                        <button
-                            onClick={() => { resetForm(); setOpen(true); }}
-                            className={termBtn}
-                            style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)", backgroundColor: "rgba(52,211,153,0.06)" }}
-                        >
-                            <Plus className="h-3 w-3" />
-                            ADD LICENSE
-                        </button>
+                        {viewMode === "licenses" && (
+                            <button
+                                onClick={() => { resetForm(); setOpen(true); }}
+                                className={termBtn}
+                                style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)", backgroundColor: "rgba(52,211,153,0.06)" }}
+                            >
+                                <Plus className="h-3 w-3" />
+                                ADD LICENSE
+                            </button>
+                        )}
+                        {viewMode === "godaddy" && (
+                            <button
+                                onClick={fetchDomains}
+                                disabled={loadingDomains}
+                                className={termBtn}
+                                style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)", backgroundColor: "rgba(52,211,153,0.06)" }}
+                            >
+                                {loadingDomains ? (
+                                    <div className="w-3 h-3 border-t border-current rounded-full animate-spin" />
+                                ) : (
+                                    <Plus className="h-3 w-3 rotate-45" /> // Using rotate-45 as a refresh icon placeholder
+                                )}
+                                REFRESH
+                            </button>
+                        )}
+                        {viewMode === "hostinger" && (
+                            <button
+                                onClick={fetchHostingerDomains}
+                                disabled={loadingHostinger}
+                                className={termBtn}
+                                style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)", backgroundColor: "rgba(52,211,153,0.06)" }}
+                            >
+                                {loadingHostinger ? (
+                                    <div className="w-3 h-3 border-t border-current rounded-full animate-spin" />
+                                ) : (
+                                    <Plus className="h-3 w-3 rotate-45" />
+                                )}
+                                REFRESH
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -373,9 +555,13 @@ export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilter
                         style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}
                     >
                         <div className="flex items-center gap-2">
-                            <ClipboardList className="h-3.5 w-3.5" style={{ color: "rgba(255,255,255,0.3)" }} />
+                            {viewMode === "licenses" ? (
+                                <ClipboardList className="h-3.5 w-3.5" style={{ color: "rgba(255,255,255,0.3)" }} />
+                            ) : (
+                                <Globe className="h-3.5 w-3.5" style={{ color: "rgba(255,255,255,0.3)" }} />
+                            )}
                             <span className="text-[10px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.4)" }}>
-                                LICENSE RECORDS
+                                {viewMode === "licenses" ? "LICENSE RECORDS" : viewMode === "godaddy" ? "GODADDY DOMAIN RECORDS" : "HOSTINGER DOMAIN RECORDS"}
                             </span>
                         </div>
                         {/* Search */}
@@ -403,124 +589,295 @@ export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilter
 
                     {/* Table */}
                     <div className="overflow-x-auto flex-1">
-                        {loadingActivities ? (
-                            <div className="flex items-center justify-center gap-2 py-10" style={{ color: "rgba(255,255,255,0.25)" }}>
-                                <div className="w-3.5 h-3.5 border-t border-current rounded-full animate-spin" />
-                                <span className="text-[9px] uppercase tracking-widest">LOADING...</span>
-                            </div>
-                        ) : errorActivities ? (
-                            <div className="flex items-center gap-2 p-4 text-[10px]" style={{ color: "#f87171" }}>
-                                <TerminalDot color="#f87171" /> {errorActivities}
-                            </div>
-                        ) : filteredActivities.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-12 gap-2">
-                                <ClipboardList className="h-6 w-6 opacity-10" />
-                                <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
-                                    NO LICENSE RECORDS
-                                </span>
-                            </div>
-                        ) : (
-                            <table className="w-full border-collapse" style={{ minWidth: "1000px" }}>
-                                <thead>
-                                    <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
-                                        <THead>
-                                            <input
-                                                type="checkbox"
-                                                onChange={toggleSelectAll}
-                                                checked={
-                                                    paginatedActivities.length > 0 &&
-                                                    paginatedActivities.every((item) => selectedIds.has(item.id))
-                                                }
-                                                aria-label="Select all items on page"
-                                                className="accent-emerald-400"
-                                            />
-                                        </THead>
-                                        <THead>Actions</THead>
-                                        <THead>Software Name</THead>
-                                        <THead>Version</THead>
-                                        <THead>Total Purchased</THead>
-                                        <THead>Managed Installs</THead>
-                                        <THead>Remaining</THead>
-                                        <THead>Compliance</THead>
-                                        <THead>Action</THead>
-                                        <THead>Purchase Date</THead>
-                                        <THead>Asset Age</THead>
-                                        <THead>Remarks</THead>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {paginatedActivities.map((item, idx) => (
-                                        <tr
-                                            key={item.id}
-                                            style={{
-                                                backgroundColor: selectedIds.has(item.id)
-                                                    ? "rgba(52,211,153,0.05)"
-                                                    : idx % 2 === 0
-                                                    ? "transparent"
-                                                    : "rgba(255,255,255,0.012)",
-                                            }}
-                                        >
-                                            <td
-                                                className="px-3 py-2.5"
-                                                style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
-                                            >
+                        {viewMode === "licenses" ? (
+                            loadingActivities ? (
+                                <div className="flex items-center justify-center gap-2 py-10" style={{ color: "rgba(255,255,255,0.25)" }}>
+                                    <div className="w-3.5 h-3.5 border-t border-current rounded-full animate-spin" />
+                                    <span className="text-[9px] uppercase tracking-widest">LOADING...</span>
+                                </div>
+                            ) : errorActivities ? (
+                                <div className="flex items-center gap-2 p-4 text-[10px]" style={{ color: "#f87171" }}>
+                                    <TerminalDot color="#f87171" /> {errorActivities}
+                                </div>
+                            ) : filteredActivities.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                    <ClipboardList className="h-6 w-6 opacity-10" />
+                                    <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                                        NO LICENSE RECORDS
+                                    </span>
+                                </div>
+                            ) : (
+                                <table className="w-full border-collapse" style={{ minWidth: "1000px" }}>
+                                    {/* ... Licenses Table Header and Body ... */}
+                                    <thead>
+                                        <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                                            <THead>
                                                 <input
                                                     type="checkbox"
-                                                    checked={selectedIds.has(item.id)}
-                                                    onChange={() => toggleSelect(item.id)}
-                                                    aria-label={`Select item ${item.software_name || item.id}`}
+                                                    onChange={toggleSelectAll}
+                                                    checked={
+                                                        paginatedActivities.length > 0 &&
+                                                        paginatedActivities.every((item) => selectedIds.has(item.id))
+                                                    }
+                                                    aria-label="Select all items on page"
                                                     className="accent-emerald-400"
                                                 />
-                                            </td>
-                                            <td
-                                                className="px-3 py-2 whitespace-nowrap"
-                                                style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                                            </THead>
+                                            <THead>Actions</THead>
+                                            <THead>Software Name</THead>
+                                            <THead>Version</THead>
+                                            <THead>Total Purchased</THead>
+                                            <THead>Managed Installs</THead>
+                                            <THead>Remaining</THead>
+                                            <THead>Compliance</THead>
+                                            <THead>Action</THead>
+                                            <THead>Purchase Date</THead>
+                                            <THead>Asset Age</THead>
+                                            <THead>Remarks</THead>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedActivities.map((item, idx) => (
+                                            <tr
+                                                key={item.id}
+                                                style={{
+                                                    backgroundColor: selectedIds.has(item.id)
+                                                        ? "rgba(52,211,153,0.05)"
+                                                        : idx % 2 === 0
+                                                        ? "transparent"
+                                                        : "rgba(255,255,255,0.012)",
+                                                }}
                                             >
-                                                <button
-                                                    onClick={() => openEditDialog(item)}
-                                                    className={`${termBtn} text-[9px] py-1 px-2`}
-                                                    style={{ color: "#38bdf8", borderColor: "rgba(56,189,248,0.25)", backgroundColor: "rgba(56,189,248,0.05)" }}
+                                                <td
+                                                    className="px-3 py-2.5"
+                                                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
                                                 >
-                                                    <Pencil className="h-2.5 w-2.5" />
-                                                </button>
-                                            </td>
-                                            <TCell>{item.software_name}</TCell>
-                                            <TCell mono>{item.software_version}</TCell>
-                                            <TCell mono>{item.total_purchased}</TCell>
-                                            <TCell>{item.managed_installation}</TCell>
-                                            <TCell mono>{item.remaining}</TCell>
-                                            <TCell>
-                                                {item.compliance_status ? (
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedIds.has(item.id)}
+                                                        onChange={() => toggleSelect(item.id)}
+                                                        aria-label={`Select item ${item.software_name || item.id}`}
+                                                        className="accent-emerald-400"
+                                                    />
+                                                </td>
+                                                <td
+                                                    className="px-3 py-2 whitespace-nowrap"
+                                                    style={{ borderBottom: "1px solid rgba(255,255,255,0.04)" }}
+                                                >
+                                                    <button
+                                                        onClick={() => openEditDialog(item)}
+                                                        className={`${termBtn} text-[9px] py-1 px-2`}
+                                                        style={{ color: "#38bdf8", borderColor: "rgba(56,189,248,0.25)", backgroundColor: "rgba(56,189,248,0.05)" }}
+                                                    >
+                                                        <Pencil className="h-2.5 w-2.5" />
+                                                    </button>
+                                                </td>
+                                                <TCell>{item.software_name}</TCell>
+                                                <TCell mono>{item.software_version}</TCell>
+                                                <TCell mono>{item.total_purchased}</TCell>
+                                                <TCell>{item.managed_installation}</TCell>
+                                                <TCell mono>{item.remaining}</TCell>
+                                                <TCell>
+                                                    {item.compliance_status ? (
+                                                        <span
+                                                            className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border"
+                                                            style={{
+                                                                color: "rgba(255,255,255,0.5)",
+                                                                borderColor: "rgba(255,255,255,0.1)",
+                                                                backgroundColor: "rgba(255,255,255,0.04)",
+                                                            }}
+                                                        >
+                                                            {item.compliance_status}
+                                                        </span>
+                                                    ) : (
+                                                        <span style={{ color: "rgba(255,255,255,0.18)" }}>—</span>
+                                                    )}
+                                                </TCell>
+                                                <TCell>{item.action}</TCell>
+                                                <TCell muted>
+                                                    {item.purchase_date
+                                                        ? new Date(item.purchase_date).toLocaleDateString(undefined, {
+                                                              year: "numeric",
+                                                              month: "short",
+                                                              day: "numeric",
+                                                          })
+                                                        : undefined}
+                                                </TCell>
+                                                <TCell muted>{item.asset_age}</TCell>
+                                                <TCell>{item.remarks}</TCell>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )
+                        ) : viewMode === "godaddy" ? (
+                            loadingDomains ? (
+                                <div className="flex items-center justify-center gap-2 py-10" style={{ color: "rgba(255,255,255,0.25)" }}>
+                                    <div className="w-3.5 h-3.5 border-t border-current rounded-full animate-spin" />
+                                    <span className="text-[9px] uppercase tracking-widest">FETCHING GODADDY DOMAINS...</span>
+                                </div>
+                            ) : errorDomains ? (
+                                <div className="flex items-center gap-2 p-4 text-[10px]" style={{ color: "#f87171" }}>
+                                    <TerminalDot color="#f87171" /> {errorDomains}
+                                </div>
+                            ) : filteredDomains.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                    <Globe className="h-6 w-6 opacity-10" />
+                                    <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                                        NO GODADDY DOMAINS FOUND
+                                    </span>
+                                </div>
+                            ) : (
+                                <table className="w-full border-collapse" style={{ minWidth: "1000px" }}>
+                                    <thead>
+                                        <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                                            <THead>Domain Name</THead>
+                                            <THead>Status</THead>
+                                            <THead>Expiration Date</THead>
+                                            <THead>Auto Renew</THead>
+                                            <THead>Renewable</THead>
+                                            <THead>Domain ID</THead>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedDomains.map((item, idx) => (
+                                            <tr
+                                                key={item.domainId}
+                                                style={{
+                                                    backgroundColor: idx % 2 === 0
+                                                        ? "transparent"
+                                                        : "rgba(255,255,255,0.012)",
+                                                }}
+                                            >
+                                                <TCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Globe className="h-3 w-3 text-emerald-400" />
+                                                        <span className="font-bold text-white/80">{item.domain}</span>
+                                                    </div>
+                                                </TCell>
+                                                <TCell>
                                                     <span
                                                         className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border"
                                                         style={{
-                                                            color: "rgba(255,255,255,0.5)",
-                                                            borderColor: "rgba(255,255,255,0.1)",
-                                                            backgroundColor: "rgba(255,255,255,0.04)",
+                                                            color: item.status === "ACTIVE" ? "#34d399" : "#f87171",
+                                                            borderColor: item.status === "ACTIVE" ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)",
+                                                            backgroundColor: item.status === "ACTIVE" ? "rgba(52,211,153,0.06)" : "rgba(248,113,113,0.06)",
                                                         }}
                                                     >
-                                                        {item.compliance_status}
+                                                        {item.status}
                                                     </span>
-                                                ) : (
-                                                    <span style={{ color: "rgba(255,255,255,0.18)" }}>—</span>
-                                                )}
-                                            </TCell>
-                                            <TCell>{item.action}</TCell>
-                                            <TCell muted>
-                                                {item.purchase_date
-                                                    ? new Date(item.purchase_date).toLocaleDateString(undefined, {
-                                                          year: "numeric",
-                                                          month: "short",
-                                                          day: "numeric",
-                                                      })
-                                                    : undefined}
-                                            </TCell>
-                                            <TCell muted>{item.asset_age}</TCell>
-                                            <TCell>{item.remarks}</TCell>
+                                                </TCell>
+                                                <TCell mono>
+                                                    {new Date(item.expires).toLocaleDateString(undefined, {
+                                                        year: "numeric",
+                                                        month: "long",
+                                                        day: "numeric",
+                                                    })}
+                                                    <span className="ml-2 opacity-30 text-[9px]">
+                                                        ({Math.ceil((new Date(item.expires).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left)
+                                                    </span>
+                                                </TCell>
+                                                <TCell>
+                                                    <span style={{ color: item.renewAuto ? "#34d399" : "rgba(255,255,255,0.3)" }}>
+                                                        {item.renewAuto ? "ENABLED" : "DISABLED"}
+                                                    </span>
+                                                </TCell>
+                                                <TCell>
+                                                    <span style={{ color: item.renewable ? "#34d399" : "#f87171" }}>
+                                                        {item.renewable ? "YES" : "NO"}
+                                                    </span>
+                                                </TCell>
+                                                <TCell muted mono>{item.domainId}</TCell>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )
+                        ) : (
+                            loadingHostinger ? (
+                                <div className="flex items-center justify-center gap-2 py-10" style={{ color: "rgba(255,255,255,0.25)" }}>
+                                    <div className="w-3.5 h-3.5 border-t border-current rounded-full animate-spin" />
+                                    <span className="text-[9px] uppercase tracking-widest">FETCHING HOSTINGER DOMAINS...</span>
+                                </div>
+                            ) : errorHostinger ? (
+                                <div className="flex items-center gap-2 p-4 text-[10px]" style={{ color: "#f87171" }}>
+                                    <TerminalDot color="#f87171" /> {errorHostinger}
+                                </div>
+                            ) : filteredHostingerDomains.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 gap-2">
+                                    <Globe className="h-6 w-6 opacity-10" />
+                                    <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
+                                        NO HOSTINGER DOMAINS FOUND
+                                    </span>
+                                </div>
+                            ) : (
+                                <table className="w-full border-collapse" style={{ minWidth: "1000px" }}>
+                                    <thead>
+                                        <tr style={{ backgroundColor: "rgba(0,0,0,0.4)" }}>
+                                            <THead>Domain Name</THead>
+                                            <THead>Status</THead>
+                                            <THead>Expiration Date</THead>
+                                            <THead>Auto Renew</THead>
+                                            <THead>Domain ID</THead>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
+                                    </thead>
+                                    <tbody>
+                                        {paginatedHostingerDomains.map((item, idx) => (
+                                            <tr
+                                                key={item.id}
+                                                style={{
+                                                    backgroundColor: idx % 2 === 0
+                                                        ? "transparent"
+                                                        : "rgba(255,255,255,0.012)",
+                                                }}
+                                            >
+                                                <TCell>
+                                                    <div className="flex items-center gap-2">
+                                                        <Globe className="h-3 w-3 text-emerald-400" />
+                                                        <span className="font-bold text-white/80">
+                                                            {(item as any).domain || (item as any).domain_name || "UNKNOWN"}
+                                                        </span>
+                                                    </div>
+                                                </TCell>
+                                                <TCell>
+                                                    <span
+                                                        className="text-[9px] uppercase tracking-widest px-1.5 py-0.5 border"
+                                                        style={{
+                                                            color: (item.status === "active" || item.status === "ACTIVE") ? "#34d399" : "#f87171",
+                                                            borderColor: (item.status === "active" || item.status === "ACTIVE") ? "rgba(52,211,153,0.3)" : "rgba(248,113,113,0.3)",
+                                                            backgroundColor: (item.status === "active" || item.status === "ACTIVE") ? "rgba(52,211,153,0.06)" : "rgba(248,113,113,0.06)",
+                                                        }}
+                                                    >
+                                                        {item.status}
+                                                    </span>
+                                                </TCell>
+                                                <TCell mono>
+                                                    {((item as any).expires_at || (item as any).expires || (item as any).expiration_date) ? (
+                                                        <>
+                                                            {new Date((item as any).expires_at || (item as any).expires || (item as any).expiration_date).toLocaleDateString(undefined, {
+                                                                year: "numeric",
+                                                                month: "long",
+                                                                day: "numeric",
+                                                            })}
+                                                            <span className="ml-2 opacity-30 text-[9px]">
+                                                                ({Math.ceil((new Date((item as any).expires_at || (item as any).expires || (item as any).expiration_date).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))} days left)
+                                                            </span>
+                                                        </>
+                                                    ) : (
+                                                        <span className="opacity-30">—</span>
+                                                    )}
+                                                </TCell>
+                                                <TCell>
+                                                    <span style={{ color: ((item as any).auto_renew || (item as any).renewAuto) ? "#34d399" : "rgba(255,255,255,0.3)" }}>
+                                                        {((item as any).auto_renew || (item as any).renewAuto) ? "ENABLED" : "DISABLED"}
+                                                    </span>
+                                                </TCell>
+                                                <TCell muted mono>{item.id || (item as any).domainId || "—"}</TCell>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )
                         )}
                     </div>
 
@@ -530,9 +887,19 @@ export const License: React.FC<LicenseProps> = ({ referenceid, dateCreatedFilter
                         style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.2)" }}
                     >
                         <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>
-                            {filteredActivities.length === 0
-                                ? "0 RECORDS"
-                                : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredActivities.length)} OF ${filteredActivities.length}`}
+                            {viewMode === "licenses" ? (
+                                filteredActivities.length === 0
+                                    ? "0 RECORDS"
+                                    : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredActivities.length)} OF ${filteredActivities.length}`
+                            ) : viewMode === "godaddy" ? (
+                                filteredDomains.length === 0
+                                    ? "0 RECORDS"
+                                    : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredDomains.length)} OF ${filteredDomains.length}`
+                            ) : (
+                                filteredHostingerDomains.length === 0
+                                    ? "0 RECORDS"
+                                    : `${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, filteredHostingerDomains.length)} OF ${filteredHostingerDomains.length}`
+                            )}
                         </span>
                         <div className="flex items-center gap-1">
                             <button
