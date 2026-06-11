@@ -42,9 +42,8 @@ type InventoryFilters = {
 };
 
 interface TicketProps {
-    referenceid: string;
-    dateCreatedFilterRange: DateRange | undefined;
-    setDateCreatedFilterRangeAction: React.Dispatch<React.SetStateAction<DateRange | undefined>>;
+  dateCreatedFilterRange: DateRange | undefined;
+  setDateCreatedFilterRangeAction: React.Dispatch<React.SetStateAction<DateRange | undefined>>;
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -112,7 +111,7 @@ function TCell({ children, mono = false }: { children: React.ReactNode; mono?: b
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilterRange }) => {
+export const Inventory: React.FC<TicketProps> = ({ dateCreatedFilterRange }) => {
     const [activities,        setActivities]        = useState<InventoryItem[]>([]);
     const [loadingActivities, setLoadingActivities] = useState(false);
     const [errorActivities,   setErrorActivities]   = useState<string | null>(null);
@@ -144,22 +143,18 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
     const [updatingOldItems, setUpdatingOldItems] = useState(false);
     const [bulkOpen,         setBulkOpen]         = useState(false);
     const [bulkFile,         setBulkFile]         = useState<File | null>(null);
-    const [bulkReferenceId,  setBulkReferenceId]  = useState(referenceid);
     const [uploadingBulk,    setUploadingBulk]    = useState(false);
     const [disposeSheetOpen,   setDisposeSheetOpen]   = useState(false);
     const [selectedDisposeIds, setSelectedDisposeIds] = useState<Set<string>>(new Set());
 
     const pageSize = useMemo(() => { const s = Number(filters.pageSize); return Number.isFinite(s) && s > 0 ? s : 25; }, [filters.pageSize]);
 
-    useEffect(() => { setBulkReferenceId(referenceid); }, [referenceid]);
-
     function handleSelectChange(name: string, value: string) { setForm((p) => ({ ...p, [name]: value })); }
     function handleSetAssetTag(value: string) { setForm((p) => ({ ...p, asset_tag: value })); }
 
     const fetchActivities = useCallback(() => {
-        if (!referenceid) { setActivities([]); setHasOldItems(false); setOldItems([]); return; }
         setLoadingActivities(true); setErrorActivities(null);
-        fetch(`/api/fetch-inventory?referenceid=${encodeURIComponent(referenceid)}`)
+        fetch(`/api/fetch-inventory`)
             .then(async (res) => { if (!res.ok) throw new Error("Failed to fetch activities"); return res.json(); })
             .then((data) => {
                 const items: InventoryItem[] = data.data || [];
@@ -170,13 +165,12 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
             })
             .catch((err) => setErrorActivities(err.message))
             .finally(() => setLoadingActivities(false));
-    }, [referenceid]);
+    }, []);
 
     useEffect(() => {
         fetchActivities();
-        if (!referenceid) return;
-        const channel = supabase.channel(`public:inventory:referenceid=eq.${referenceid}`)
-            .on("postgres_changes", { event: "*", schema: "public", table: "inventory", filter: `referenceid=eq.${referenceid}` }, (payload) => {
+        const channel = supabase.channel(`public:inventory`)
+            .on("postgres_changes", { event: "*", schema: "public", table: "inventory" }, (payload) => {
                 const n = payload.new as InventoryItem; const o = payload.old as InventoryItem;
                 setActivities((curr) => {
                     switch (payload.eventType) {
@@ -188,7 +182,7 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
                 });
             }).subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [referenceid, fetchActivities]);
+    }, [fetchActivities]);
 
     function resetFilters() { setFilters({ status: "", location: "", asset_type: "", department: "", brand: "", model: "", processor: "", storage: "", pageSize: "25" }); setPage(1); }
     function applyFilters() { setPage(1); setFilterSheetOpen(false); }
@@ -226,7 +220,7 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
     async function handleSubmit() {
         if (!form.status) { alert("Status is required"); return; }
         try {
-            const res = await fetch("/api/create-inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, referenceid }) });
+            const res = await fetch("/api/create-inventory", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form }) });
             if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed to create inventory"); }
             toast.success("Record created."); fetchActivities(); setOpen(false); resetForm();
         } catch (e: any) { toast.error(e.message); }
@@ -235,7 +229,7 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
     async function handleUpdate() {
         if (!form.status || !editingId) { alert("Status is required"); return; }
         try {
-            const res = await fetch(`/api/update-inventory?id=${encodeURIComponent(editingId)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form, referenceid }) });
+            const res = await fetch(`/api/update-inventory?id=${encodeURIComponent(editingId)}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...form }) });
             if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed to update inventory"); }
             toast.success("Record updated."); fetchActivities(); setOpen(false); resetForm();
         } catch (e: any) { toast.error(e.message); }
@@ -299,7 +293,7 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
             const allowed = ["asset_tag","asset_type","status","location","new_user","old_user","department","position","brand","model","processor","ram","storage","serial_number","purchase_date","warranty_date","asset_age","amount","remarks","mac_address"];
             const invalid = headers.filter(h => !allowed.includes(h));
             if (invalid.length > 0) throw new Error(`Invalid column(s): ${invalid.join(", ")}`);
-            const records = lines.slice(1).map(line => { const vals = line.split(",").map(v => v.replace(/^"|"$/g, "").trim()); const row: any = { referenceid: bulkReferenceId, status: "Spare" }; headers.forEach((h, i) => { row[h] = vals[i] || null; }); return row; });
+            const records = lines.slice(1).map(line => { const vals = line.split(",").map(v => v.replace(/^"|"$/g, "").trim()); const row: any = { referenceid: null, status: "Spare" }; headers.forEach((h, i) => { row[h] = vals[i] || null; }); return row; });
             const { error } = await supabase.from("inventory").insert(records);
             if (error) throw error;
             toast.success(`${records.length} record(s) imported.`); setBulkOpen(false); setBulkFile(null); fetchActivities();
@@ -348,7 +342,6 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
                     <div className="flex items-center gap-3">
                         <TerminalDot color="#22c55e" />
                         <span className="text-[10px] uppercase tracking-[0.2em]" style={{ color: "rgba(255,255,255,0.4)" }}>INVENTORY SYSTEM</span>
-                        <span className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.2)" }}>/ {referenceid}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>STATUS</span>
@@ -611,10 +604,6 @@ export const Inventory: React.FC<TicketProps> = ({ referenceid, dateCreatedFilte
                         <DialogDescription className="text-[10px] font-mono" style={{ color: "rgba(255,255,255,0.3)" }}>Upload a CSV file. Column names must match inventory fields.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-3 py-2">
-                        <div>
-                            <label className="text-[9px] uppercase tracking-widest block mb-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>Reference ID</label>
-                            <input value={bulkReferenceId} disabled className="w-full px-3 py-1.5 text-[11px] font-mono border outline-none" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.3)" }} />
-                        </div>
                         <div>
                             <label className="text-[9px] uppercase tracking-widest block mb-1.5" style={{ color: "rgba(255,255,255,0.3)" }}>CSV File</label>
                             <input type="file" accept=".csv" onChange={(e) => setBulkFile(e.target.files?.[0] || null)} className="w-full px-3 py-1.5 text-[11px] font-mono border outline-none file:mr-3 file:text-[9px] file:uppercase file:tracking-widest file:border-0 file:bg-transparent" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)" }} />

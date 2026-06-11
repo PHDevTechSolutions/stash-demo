@@ -1,127 +1,67 @@
 "use client";
 
-import React, { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import React, { useState, Suspense } from "react";
 
-import { UserProvider, useUser } from "@/contexts/UserContext";
 import { FormatProvider } from "@/contexts/FormatContext";
 import { SidebarLeft } from "@/components/sidebar-left";
 import { SidebarRight } from "@/components/sidebar-right";
 
-import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage, } from "@/components/ui/breadcrumb";
+import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { toast } from "sonner";
 
 import { Inventory } from "@/components/inventory";
 import { type DateRange } from "react-day-picker";
 
-interface UserDetails {
-    referenceid: string;
-}
-
 function DashboardContent() {
-    const searchParams = useSearchParams();
-    const { userId, setUserId } = useUser();
+  const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = React.useState<
+    DateRange | undefined
+  >(undefined);
 
-    const [userDetails, setUserDetails] = useState<UserDetails>({
-        referenceid: "",
-    });
+  return (
+    <>
+      <SidebarLeft />
+      <SidebarInset className="overflow-hidden" style={{ backgroundColor: "#080c10", minHeight: "100%" }}>
+        <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 border-b-1" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
+          <div className="flex flex-1 items-center gap-2 px-3">
+            <SidebarTrigger />
+            <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem>
+                  <BreadcrumbPage className="line-clamp-1 text-white">Inventory</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+        </header>
 
-    const [loadingUser, setLoadingUser] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = React.useState<
-        DateRange | undefined
-    >(undefined);
-
-    const queryUserId = searchParams?.get("id") ?? "";
-
-    // Sync URL query param with userId context
-    useEffect(() => {
-        if (queryUserId && queryUserId !== userId) {
-            setUserId(queryUserId);
-        }
-    }, [queryUserId, userId, setUserId]);
-
-    // Fetch user details when userId changes
-    useEffect(() => {
-        if (!userId) {
-            setError("User ID is missing.");
-            setLoadingUser(false);
-            return;
-        }
-
-        const fetchUserData = async () => {
-            setError(null);
-            setLoadingUser(true);
-            try {
-                const response = await fetch(`/api/user?id=${encodeURIComponent(userId)}`);
-                if (!response.ok) throw new Error("Failed to fetch user data");
-                const data = await response.json();
-
-                setUserDetails({
-                    referenceid: data.ReferenceID || "",
-                });
-
-                toast.success("User data loaded successfully!");
-            } catch (err) {
-                console.error("Error fetching user data:", err);
-                toast.error("Failed to connect to server. Please try again later or refresh your network connection");
-            } finally {
-                setLoadingUser(false);
-            }
-        };
-
-        fetchUserData();
-    }, [userId]);
-
-    return (
-        <>
-            <SidebarLeft />
-            <SidebarInset className="overflow-hidden" style={{ backgroundColor: "#080c10", minHeight: "100%"}}>
-                <header className="sticky top-0 flex h-14 shrink-0 items-center gap-2 border-b-1" style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.1)", color: "rgba(255,255,255,0.7)" }}>
-                    <div className="flex flex-1 items-center gap-2 px-3">
-                        <SidebarTrigger />
-                        <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
-                        <Breadcrumb>
-                            <BreadcrumbList>
-                                <BreadcrumbItem>
-                                    <BreadcrumbPage className="line-clamp-1 text-white">Inventory</BreadcrumbPage>
-                                </BreadcrumbItem>
-                            </BreadcrumbList>
-                        </Breadcrumb>
-                    </div>
-                </header>
-
-                <main className="flex flex-1 flex-col gap-4 p-4 overflow-auto" style={{ backgroundColor: "#080c10", minHeight: "100%" }}>
-                    <div>
-                        <Inventory
-                            referenceid={userDetails.referenceid}
-                            dateCreatedFilterRange={dateCreatedFilterRange}
-                            setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction} />
-                    </div>
-                </main>
-            </SidebarInset>
-
-            <SidebarRight
-                userId={userId ?? undefined}
-                dateCreatedFilterRange={dateCreatedFilterRange}
-                setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+        <main className="flex flex-1 flex-col gap-4 p-4 overflow-auto" style={{ backgroundColor: "#080c10", minHeight: "100%" }}>
+          <div>
+            <Inventory
+              dateCreatedFilterRange={dateCreatedFilterRange}
+              setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
             />
-        </>
-    );
+          </div>
+        </main>
+      </SidebarInset>
+
+      <SidebarRight
+        dateCreatedFilterRange={dateCreatedFilterRange}
+        setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
+      />
+    </>
+  );
 }
 
 export default function Page() {
-    return (
-        <UserProvider>
-            <FormatProvider>
-                <SidebarProvider>
-                    <Suspense fallback={<div>Loading...</div>}>
-                        <DashboardContent />
-                    </Suspense>
-                </SidebarProvider>
-            </FormatProvider>
-        </UserProvider>
-    );
+  return (
+    <FormatProvider>
+      <SidebarProvider>
+        <Suspense fallback={<div>Loading...</div>}>
+          <DashboardContent />
+        </Suspense>
+      </SidebarProvider>
+    </FormatProvider>
+  );
 }

@@ -33,16 +33,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       mac_address,
     } = req.body;
 
-    if (!referenceid) {
-      return res.status(400).json({ error: "referenceid is required" });
-    }
-
     if (!status) {
       return res.status(400).json({ error: "status is required" });
     }
 
     const newItem = {
-      referenceid,
+      referenceid: referenceid || null,
       asset_tag: asset_tag || null,
       asset_type: asset_type || null,
       status,

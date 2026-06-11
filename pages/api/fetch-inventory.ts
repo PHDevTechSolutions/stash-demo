@@ -7,17 +7,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: `Method ${req.method} not allowed` });
   }
 
-  const { referenceid } = req.query;
-
-  if (!referenceid || typeof referenceid !== "string") {
-    return res.status(400).json({ error: "referenceid query parameter is required" });
-  }
-
   try {
     const { data, error } = await supabase
       .from("inventory")
-      .select("*")
-      .eq("referenceid", referenceid);
+      .select("*");
 
     if (error) {
       console.error("Supabase fetch error:", error);
