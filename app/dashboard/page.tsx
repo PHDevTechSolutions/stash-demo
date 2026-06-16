@@ -51,6 +51,19 @@ interface UserDetails {
   referenceid: string;
 }
 
+interface SupplyItem {
+  id: string;
+  name: string;
+  category?: string;
+  brand?: string;
+  model?: string;
+  quantity?: number;
+  unit?: string;
+  location?: string;
+  condition?: string;
+  department?: string;
+}
+
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function TerminalDot({ color }: { color: string }) {
@@ -84,6 +97,31 @@ function TCell({ children, mono = false }: { children?: React.ReactNode; mono?: 
   );
 }
 
+function SupplyDistPanel({ title, dot, data, accentColor }: { title: string; dot: string; data: Record<string, number>; accentColor: string }) {
+  return (
+    <div className="border flex flex-col" style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}>
+      <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}>
+        <span className="inline-flex w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dot, boxShadow: `0 0 4px ${dot}` }} />
+        <span className="text-[9px] uppercase tracking-[0.2em] font-bold" style={{ color: accentColor }}>{title}</span>
+      </div>
+      <div className="p-3 flex flex-col gap-1.5">
+        {Object.entries(data).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([label, count]) => (
+          <div key={label} className="flex items-center justify-between px-2 py-1.5 border" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+            <span className="text-[9px] truncate pr-2 font-mono" style={{ color: "rgba(255,255,255,0.55)" }}>{label}</span>
+            <span className="text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 border"
+              style={{ color: accentColor, borderColor: `${accentColor}40`, backgroundColor: `${accentColor}10` }}>
+              {count}
+            </span>
+          </div>
+        ))}
+        {Object.keys(data).length === 0 && (
+          <span className="text-[9px] uppercase tracking-widest py-2 text-center" style={{ color: "rgba(255,255,255,0.2)" }}>NO DATA</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Dashboard Content ────────────────────────────────────────────────────────
 
 function DashboardContent() {
@@ -100,6 +138,10 @@ function DashboardContent() {
 
   const [domains, setDomains] = useState<DomainItem[]>([]);
   const [loadingDomains, setLoadingDomains] = useState(false);
+
+  // Supplies state
+  const [supplies,        setSupplies]        = useState<SupplyItem[]>([]);
+  const [loadingSupplies, setLoadingSupplies] = useState(false);
 
   const queryUserId = searchParams?.get("id") ?? "";
 
@@ -228,10 +270,26 @@ function DashboardContent() {
     }
   }, []);
 
+  const fetchSupplies = useCallback(async () => {
+    if (!referenceid) { setSupplies([]); return; }
+    setLoadingSupplies(true);
+    try {
+      const { data, error } = await supabase
+        .from("supplies").select("id,name,category,brand,model,quantity,unit,location,condition,department")
+        .eq("referenceid", referenceid)
+        .order("date_created", { ascending: false });
+      if (error) throw error;
+      setSupplies(data ?? []);
+    } catch (err) {
+      console.error("Error fetching supplies:", err);
+    } finally { setLoadingSupplies(false); }
+  }, [referenceid]);
+
   // ── Realtime ──────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchActivities();
     fetchDomains();
+    fetchSupplies();
     if (!referenceid) return;
     const ch = supabase
       .channel(`inventory-${referenceid}`)
@@ -252,7 +310,7 @@ function DashboardContent() {
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [referenceid, fetchActivities]);
+  }, [referenceid, fetchActivities, fetchSupplies]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const counts = React.useMemo(() => {
@@ -295,6 +353,37 @@ function DashboardContent() {
       return d < today;
     });
   }, [activities]);
+
+  // ── Supplies derived data ─────────────────────────────────────────────────
+  const supplyCategoryCounts = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    supplies.forEach(({ category }) => { if (category) m[category] = (m[category] ?? 0) + 1; });
+    return m;
+  }, [supplies]);
+
+  const supplyBrandCounts = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    supplies.forEach(({ brand }) => { if (brand) m[brand] = (m[brand] ?? 0) + 1; });
+    return m;
+  }, [supplies]);
+
+  const supplyModelCounts = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    supplies.forEach(({ model }) => { if (model) m[model] = (m[model] ?? 0) + 1; });
+    return m;
+  }, [supplies]);
+
+  const supplyLocationCounts = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    supplies.forEach(({ location }) => { if (location) m[location] = (m[location] ?? 0) + 1; });
+    return m;
+  }, [supplies]);
+
+  const supplyConditionCounts = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    supplies.forEach(({ condition }) => { if (condition) m[condition] = (m[condition] ?? 0) + 1; });
+    return m;
+  }, [supplies]);
 
   // ── Expired warranty table state ──────────────────────────────────────────
   const [warrantySearch,       setWarrantySearch]       = useState("");
@@ -669,6 +758,66 @@ function DashboardContent() {
                     </>
                   )}
                 </div>
+                {/* ── Supplies Overview ── */}
+                <div className="border flex flex-col" style={{ borderColor: "rgba(167,139,250,0.2)", backgroundColor: "rgba(167,139,250,0.01)" }}>
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b" style={{ borderColor: "rgba(167,139,250,0.15)", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                    <TerminalDot color="#a78bfa" />
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "#a78bfa" }}>SUPPLIES OVERVIEW</span>
+                    <span className="ml-auto text-[9px] font-mono px-2 py-0.5 border" style={{ color: "#a78bfa", borderColor: "rgba(167,139,250,0.3)", backgroundColor: "rgba(167,139,250,0.06)" }}>
+                      {supplies.length} TOTAL ITEMS
+                    </span>
+                  </div>
+
+                  {loadingSupplies ? (
+                    <div className="flex items-center justify-center gap-2 py-8" style={{ color: "rgba(255,255,255,0.25)" }}>
+                      <div className="w-3 h-3 border-t border-current rounded-full animate-spin" />
+                      <span className="text-[9px] uppercase tracking-widest">LOADING SUPPLIES...</span>
+                    </div>
+                  ) : supplies.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>NO SUPPLY DATA</span>
+                    </div>
+                  ) : (
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+
+                      {/* Category */}
+                      <SupplyDistPanel title="CATEGORY" dot="#a78bfa" data={supplyCategoryCounts} accentColor="#a78bfa" />
+
+                      {/* Brand */}
+                      <SupplyDistPanel title="BRAND" dot="#38bdf8" data={supplyBrandCounts} accentColor="#38bdf8" />
+
+                      {/* Model */}
+                      <SupplyDistPanel title="MODEL" dot="#fbbf24" data={supplyModelCounts} accentColor="#fbbf24" />
+
+                      {/* Location */}
+                      <SupplyDistPanel title="LOCATION" dot="#34d399" data={supplyLocationCounts} accentColor="#34d399" />
+
+                      {/* Condition */}
+                      <div className="border flex flex-col" style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}>
+                        <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                          <TerminalDot color="#fb923c" />
+                          <span className="text-[9px] uppercase tracking-[0.2em] font-bold" style={{ color: "#fb923c" }}>CONDITION</span>
+                        </div>
+                        <div className="p-3 flex flex-col gap-1.5">
+                          {Object.entries(supplyConditionCounts).sort((a, b) => b[1] - a[1]).map(([cond, count]) => {
+                            const color = cond === "Good" ? "#34d399" : cond === "Defective" || cond === "Disposed" ? "#f87171" : "#fbbf24";
+                            return (
+                              <div key={cond} className="flex items-center justify-between px-2 py-1.5 border" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                                <span className="text-[9px] uppercase tracking-widest font-mono" style={{ color }}>{cond}</span>
+                                <span className="text-[10px] font-mono font-bold px-2 py-0.5 border" style={{ color, borderColor: `${color}40`, backgroundColor: `${color}10` }}>{count}</span>
+                              </div>
+                            );
+                          })}
+                          {Object.keys(supplyConditionCounts).length === 0 && (
+                            <span className="text-[9px] uppercase tracking-widest py-2 text-center" style={{ color: "rgba(255,255,255,0.2)" }}>NO DATA</span>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
               </>
             )}
           </div>
