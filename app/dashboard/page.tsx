@@ -143,6 +143,10 @@ function DashboardContent() {
   const [supplies,        setSupplies]        = useState<SupplyItem[]>([]);
   const [loadingSupplies, setLoadingSupplies] = useState(false);
 
+  // Subscriptions state
+  const [subscriptions,        setSubscriptions]        = useState<{ id: string; service_name: string; amount?: number; currency?: string; department?: string; status?: string; renewal_date?: string }[]>([]);
+  const [loadingSubscriptions, setLoadingSubscriptions] = useState(false);
+
   const queryUserId = searchParams?.get("id") ?? "";
 
   useEffect(() => {
@@ -285,11 +289,26 @@ function DashboardContent() {
     } finally { setLoadingSupplies(false); }
   }, [referenceid]);
 
+  const fetchSubscriptions = useCallback(async () => {
+    if (!referenceid) { setSubscriptions([]); return; }
+    setLoadingSubscriptions(true);
+    try {
+      const { data, error } = await supabase
+        .from("service_subscriptions")
+        .select("id,service_name,amount,currency,department,status,renewal_date")
+        .eq("referenceid", referenceid);
+      if (error) throw error;
+      setSubscriptions(data ?? []);
+    } catch (err) { console.error("Error fetching subscriptions:", err); }
+    finally { setLoadingSubscriptions(false); }
+  }, [referenceid]);
+
   // ── Realtime ──────────────────────────────────────────────────────────────
   useEffect(() => {
     fetchActivities();
     fetchDomains();
     fetchSupplies();
+    fetchSubscriptions();
     if (!referenceid) return;
     const ch = supabase
       .channel(`inventory-${referenceid}`)
@@ -310,7 +329,7 @@ function DashboardContent() {
       )
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [referenceid, fetchActivities, fetchSupplies]);
+  }, [referenceid, fetchActivities, fetchSupplies, fetchSubscriptions]);
 
   // ── Derived data ──────────────────────────────────────────────────────────
   const counts = React.useMemo(() => {
@@ -384,6 +403,39 @@ function DashboardContent() {
     supplies.forEach(({ condition }) => { if (condition) m[condition] = (m[condition] ?? 0) + 1; });
     return m;
   }, [supplies]);
+
+  // ── Subscription derived data ─────────────────────────────────────────────
+  const subTotalCost = React.useMemo(() =>
+    subscriptions.reduce((sum, s) => sum + (s.amount ?? 0), 0),
+    [subscriptions]
+  );
+
+  const subByDepartment = React.useMemo(() => {
+    const m: Record<string, number> = {};
+    subscriptions.forEach(({ department, amount }) => {
+      const dept = department?.trim() || "Unassigned";
+      m[dept] = (m[dept] ?? 0) + (amount ?? 0);
+    });
+    return Object.entries(m).sort((a, b) => b[1] - a[1]);
+  }, [subscriptions]);
+
+  const subByService = React.useMemo(() =>
+    [...subscriptions]
+      .filter((s) => s.amount != null && s.amount > 0)
+      .sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0))
+      .slice(0, 10),
+    [subscriptions]
+  );
+
+  const expiringSubscriptions = React.useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return subscriptions.filter((s) => {
+      if (!s.renewal_date || s.status === "Cancelled") return false;
+      const d = new Date(s.renewal_date); d.setHours(0, 0, 0, 0);
+      const diff = Math.ceil((d.getTime() - today.getTime()) / 86400000);
+      return diff >= 0 && diff <= 7;
+    });
+  }, [subscriptions]);
 
   // ── Expired warranty table state ──────────────────────────────────────────
   const [warrantySearch,       setWarrantySearch]       = useState("");
@@ -810,6 +862,90 @@ function DashboardContent() {
                           })}
                           {Object.keys(supplyConditionCounts).length === 0 && (
                             <span className="text-[9px] uppercase tracking-widest py-2 text-center" style={{ color: "rgba(255,255,255,0.2)" }}>NO DATA</span>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  )}
+                </div>
+
+                {/* ── Subscriptions Overview ── */}
+                <div className="border flex flex-col" style={{ borderColor: "rgba(56,189,248,0.2)", backgroundColor: "rgba(56,189,248,0.01)" }}>
+                  <div className="flex items-center gap-2 px-4 py-2.5 border-b" style={{ borderColor: "rgba(56,189,248,0.12)", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                    <TerminalDot color="#38bdf8" />
+                    <span className="text-[10px] uppercase tracking-widest" style={{ color: "#38bdf8" }}>SERVICE SUBSCRIPTIONS</span>
+                    <div className="ml-auto flex items-center gap-2">
+                      {expiringSubscriptions.length > 0 && (
+                        <span className="text-[9px] font-mono px-2 py-0.5 border" style={{ color: "#fbbf24", borderColor: "rgba(251,191,36,0.3)", backgroundColor: "rgba(251,191,36,0.08)" }}>
+                          {expiringSubscriptions.length} EXPIRING SOON
+                        </span>
+                      )}
+                      <span className="text-[9px] font-mono px-2 py-0.5 border" style={{ color: "#38bdf8", borderColor: "rgba(56,189,248,0.3)", backgroundColor: "rgba(56,189,248,0.06)" }}>
+                        {subscriptions.length} SERVICES
+                      </span>
+                      <span className="text-[9px] font-mono px-2 py-0.5 border font-bold" style={{ color: "#34d399", borderColor: "rgba(52,211,153,0.3)", backgroundColor: "rgba(52,211,153,0.06)" }}>
+                        TOTAL {subscriptions[0]?.currency ?? "USD"} {subTotalCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </div>
+
+                  {loadingSubscriptions ? (
+                    <div className="flex items-center justify-center gap-2 py-8" style={{ color: "rgba(255,255,255,0.25)" }}>
+                      <div className="w-3 h-3 border-t border-current rounded-full animate-spin" />
+                      <span className="text-[9px] uppercase tracking-widest">LOADING SUBSCRIPTIONS...</span>
+                    </div>
+                  ) : subscriptions.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <span className="text-[9px] uppercase tracking-widest" style={{ color: "rgba(255,255,255,0.2)" }}>NO SUBSCRIPTION DATA</span>
+                    </div>
+                  ) : (
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                      {/* Department costing rank */}
+                      <div className="border flex flex-col" style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}>
+                        <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                          <span className="inline-flex w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#a78bfa", boxShadow: "0 0 4px #a78bfa" }} />
+                          <span className="text-[9px] uppercase tracking-[0.2em] font-bold" style={{ color: "#a78bfa" }}>COST BY DEPARTMENT</span>
+                        </div>
+                        <div className="p-3 flex flex-col gap-1.5">
+                          {subByDepartment.map(([dept, cost], i) => (
+                            <div key={dept} className="flex items-center gap-2 px-2 py-1.5 border" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                              <span className="text-[9px] font-mono shrink-0 w-5 text-center" style={{ color: "rgba(255,255,255,0.25)" }}>#{i + 1}</span>
+                              <span className="text-[10px] truncate flex-1" style={{ color: i === 0 ? "#a78bfa" : "rgba(255,255,255,0.55)" }}>{dept}</span>
+                              <span className="text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 border"
+                                style={{ color: i === 0 ? "#a78bfa" : "rgba(255,255,255,0.4)", borderColor: i === 0 ? "rgba(167,139,250,0.3)" : "rgba(255,255,255,0.08)", backgroundColor: i === 0 ? "rgba(167,139,250,0.08)" : "transparent" }}>
+                                {cost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Top services by cost */}
+                      <div className="border flex flex-col" style={{ borderColor: "rgba(255,255,255,0.07)", backgroundColor: "rgba(255,255,255,0.01)" }}>
+                        <div className="flex items-center gap-2 px-3 py-2 border-b" style={{ borderColor: "rgba(255,255,255,0.06)", backgroundColor: "rgba(0,0,0,0.3)" }}>
+                          <span className="inline-flex w-1.5 h-1.5 rounded-full" style={{ backgroundColor: "#38bdf8", boxShadow: "0 0 4px #38bdf8" }} />
+                          <span className="text-[9px] uppercase tracking-[0.2em] font-bold" style={{ color: "#38bdf8" }}>TOP SERVICES BY COST</span>
+                        </div>
+                        <div className="p-3 flex flex-col gap-1.5">
+                          {subByService.map((s, i) => (
+                            <div key={s.id} className="flex items-center gap-2 px-2 py-1.5 border" style={{ borderColor: "rgba(255,255,255,0.05)" }}>
+                              <span className="text-[9px] font-mono shrink-0 w-5 text-center" style={{ color: "rgba(255,255,255,0.25)" }}>#{i + 1}</span>
+                              <span className="text-[10px] font-bold flex-1 truncate" style={{ color: "#38bdf8" }}>{s.service_name}</span>
+                              {s.department && (
+                                <span className="text-[8px] font-mono px-1.5 py-0.5 border hidden sm:block" style={{ color: "rgba(255,255,255,0.3)", borderColor: "rgba(255,255,255,0.08)" }}>
+                                  {s.department}
+                                </span>
+                              )}
+                              <span className="text-[10px] font-mono font-bold shrink-0 px-2 py-0.5 border"
+                                style={{ color: i === 0 ? "#34d399" : "rgba(255,255,255,0.5)", borderColor: i === 0 ? "rgba(52,211,153,0.3)" : "rgba(255,255,255,0.08)", backgroundColor: i === 0 ? "rgba(52,211,153,0.06)" : "transparent" }}>
+                                {s.currency ?? ""} {s.amount?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </span>
+                            </div>
+                          ))}
+                          {subByService.length === 0 && (
+                            <span className="text-[9px] uppercase tracking-widest text-center py-2" style={{ color: "rgba(255,255,255,0.2)" }}>NO COST DATA</span>
                           )}
                         </div>
                       </div>

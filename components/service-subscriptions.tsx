@@ -18,6 +18,7 @@ interface ServiceSub {
     currency?: string;
     status?: string;
     renewal_date?: string;
+    department?: string;
     notes?: string;
     date_created?: string;
 }
@@ -86,7 +87,7 @@ function addDays(dateStr: string, days: number): string {
 
 const emptyForm = () => ({
     service_name: "", plan: "", billing_cycle: "", amount: "" as string | number,
-    currency: "USD", status: "Active", renewal_date: "", notes: "",
+    currency: "USD", status: "Active", renewal_date: "", department: "", notes: "",
 });
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -247,7 +248,7 @@ export function ServiceSubscriptions({ referenceid }: Props) {
     function resetForm() { setForm(emptyForm()); setEditingId(null); }
     function openEdit(item: ServiceSub) {
         setEditingId(item.id);
-        setForm({ service_name: item.service_name, plan: item.plan ?? "", billing_cycle: item.billing_cycle ?? "", amount: item.amount?.toString() ?? "", currency: item.currency ?? "USD", status: item.status ?? "Active", renewal_date: item.renewal_date ?? "", notes: item.notes ?? "" });
+        setForm({ service_name: item.service_name, plan: item.plan ?? "", billing_cycle: item.billing_cycle ?? "", amount: item.amount?.toString() ?? "", currency: item.currency ?? "USD", status: item.status ?? "Active", renewal_date: item.renewal_date ?? "", department: item.department ?? "", notes: item.notes ?? "" });
         setOpen(true);
     }
 
@@ -355,6 +356,7 @@ export function ServiceSubscriptions({ referenceid }: Props) {
                                     <THead>Renewal Date</THead>
                                     <THead>Days Left</THead>
                                     <THead>Auto-Renew</THead>
+                                    <THead>Department</THead>
                                     <THead>Notes</THead>
                                 </tr>
                             </thead>
@@ -393,6 +395,7 @@ export function ServiceSubscriptions({ referenceid }: Props) {
                                                     {autoRenew ? "YES" : "NO"}
                                                 </span>
                                             </td>
+                                            <TCell>{item.department}</TCell>
                                             <TCell>{item.notes}</TCell>
                                         </tr>
                                     );
@@ -469,6 +472,10 @@ export function ServiceSubscriptions({ referenceid }: Props) {
                         <div className="flex flex-col">
                             <FieldLabel>Renewal Date</FieldLabel>
                             <input name="renewal_date" value={form.renewal_date} onChange={handleChange} type="date" className={inputCls} style={iStyle} />
+                        </div>
+                        <div className="flex flex-col">
+                            <FieldLabel>Department</FieldLabel>
+                            <input name="department" value={form.department} onChange={handleChange} placeholder="DEPARTMENT" className={inputCls} style={iStyle} />
                         </div>
                         <div className="col-span-2 flex flex-col">
                             <FieldLabel>Notes</FieldLabel>
