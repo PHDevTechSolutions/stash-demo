@@ -14,6 +14,7 @@ import {
     Trash2,
     KeyRound,
     ShieldCheck,
+    BoxesIcon,
 } from "lucide-react";
 
 import { NavFavorites } from "@/components/nav/favorites";
@@ -48,6 +49,7 @@ const data = {
                 { name: "Disposal",       url: "/asset/disposal",  icon: Trash2        },
                 { name: "Subscriptions",  url: "/asset/license",   icon: KeyRound      },
                 { name: "Warranty",       url: "/asset/warranty",  icon: ShieldCheck   },
+                { name: "Supplies",       url: "/asset/supplies",  icon: BoxesIcon     },
             ],
         },
         {
