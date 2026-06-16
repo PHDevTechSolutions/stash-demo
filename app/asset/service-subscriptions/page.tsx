@@ -9,40 +9,28 @@ import { SidebarRight } from "@/components/sidebar-right";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbPage } from "@/components/ui/breadcrumb";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
-import { toast } from "sonner";
-import { License } from "@/components/license";
+import { ServiceSubscriptions } from "@/components/service-subscriptions";
 import { type DateRange } from "react-day-picker";
 
-interface UserDetails { referenceid: string; }
-
-function DashboardContent() {
+function PageContent() {
     const searchParams = useSearchParams();
     const { userId, setUserId } = useUser();
-    const [userDetails,   setUserDetails]   = useState<UserDetails>({ referenceid: "" });
-    const [loadingUser,   setLoadingUser]   = useState(true);
-    const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = React.useState<DateRange | undefined>(undefined);
-
     const queryUserId = searchParams?.get("id") ?? "";
+
+    const [referenceid, setReferenceid] = useState("");
+    const [dateCreatedFilterRange, setDateCreatedFilterRangeAction] = React.useState<DateRange | undefined>(undefined);
 
     useEffect(() => {
         if (queryUserId && queryUserId !== userId) setUserId(queryUserId);
     }, [queryUserId, userId, setUserId]);
 
     useEffect(() => {
-        if (!userId) { setLoadingUser(false); return; }
-        const fetchUserData = async () => {
-            setLoadingUser(true);
-            try {
-                const res  = await fetch(`/api/user?id=${encodeURIComponent(userId)}`);
-                if (!res.ok) throw new Error("Failed to fetch user data");
-                const data = await res.json();
-                setUserDetails({ referenceid: data.ReferenceID || "" });
-            } catch {
-                toast.error("Failed to connect to server.");
-            } finally { setLoadingUser(false); }
-        };
-        fetchUserData();
-    }, [userId]);
+        if (!queryUserId) return;
+        fetch(`/api/user?id=${encodeURIComponent(queryUserId)}`)
+            .then((r) => r.json())
+            .then((d) => setReferenceid(d.ReferenceID || ""))
+            .catch(() => {});
+    }, [queryUserId]);
 
     return (
         <>
@@ -59,7 +47,7 @@ function DashboardContent() {
                             <BreadcrumbList>
                                 <BreadcrumbItem>
                                     <BreadcrumbPage className="text-[10px] uppercase tracking-widest font-mono" style={{ color: "rgba(255,255,255,0.5)" }}>
-                                        Software Licenses
+                                        Platform Plans
                                     </BreadcrumbPage>
                                 </BreadcrumbItem>
                             </BreadcrumbList>
@@ -67,19 +55,14 @@ function DashboardContent() {
                     </div>
                 </header>
 
-                <main className="flex flex-1 flex-col gap-0 overflow-auto" style={{ backgroundColor: "#080c10" }}>
+                <main className="flex flex-1 flex-col overflow-auto" style={{ backgroundColor: "#080c10" }}>
+                    {/* Dot grid */}
                     <div
                         className="fixed inset-0 pointer-events-none"
                         style={{ backgroundImage: "radial-gradient(rgba(255,255,255,0.04) 1px, transparent 1px)", backgroundSize: "24px 24px", zIndex: 0 }}
                     />
                     <div className="relative z-10 p-4">
-                        {!loadingUser && (
-                            <License
-                                referenceid={userDetails.referenceid}
-                                dateCreatedFilterRange={dateCreatedFilterRange}
-                                setDateCreatedFilterRangeAction={setDateCreatedFilterRangeAction}
-                            />
-                        )}
+                        <ServiceSubscriptions referenceid={referenceid} />
                     </div>
                 </main>
             </SidebarInset>
@@ -99,7 +82,7 @@ export default function Page() {
             <FormatProvider>
                 <SidebarProvider>
                     <Suspense fallback={<div>Loading...</div>}>
-                        <DashboardContent />
+                        <PageContent />
                     </Suspense>
                 </SidebarProvider>
             </FormatProvider>

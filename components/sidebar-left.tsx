@@ -15,6 +15,7 @@ import {
     KeyRound,
     ShieldCheck,
     BoxesIcon,
+    CreditCard,
 } from "lucide-react";
 
 import { NavFavorites } from "@/components/nav/favorites";
@@ -44,12 +45,13 @@ const data = {
             name: "Asset Management",
             icon: FolderKanban,
             pages: [
-                { name: "Inventory",      url: "/asset/inventory", icon: Package      },
-                { name: "Assign Assets",  url: "/asset/assign",    icon: ClipboardList },
-                { name: "Disposal",       url: "/asset/disposal",  icon: Trash2        },
-                { name: "Subscriptions",  url: "/asset/license",   icon: KeyRound      },
-                { name: "Warranty",       url: "/asset/warranty",  icon: ShieldCheck   },
-                { name: "Supplies",       url: "/asset/supplies",  icon: BoxesIcon     },
+                { name: "Inventory",      url: "/asset/inventory",     icon: Package      },
+                { name: "Assign Assets",  url: "/asset/assign",         icon: ClipboardList },
+                { name: "Disposal",       url: "/asset/disposal",       icon: Trash2        },
+                { name: "Subscriptions",  url: "/asset/license",        icon: KeyRound      },
+                { name: "Warranty",       url: "/asset/warranty",       icon: ShieldCheck   },
+                { name: "Supplies",       url: "/asset/supplies",       icon: BoxesIcon     },
+                { name: "Platform Plans", url: "/asset/service-subscriptions",  icon: CreditCard    },
             ],
         },
         {
