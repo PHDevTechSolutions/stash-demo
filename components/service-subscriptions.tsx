@@ -111,7 +111,6 @@ export function ServiceSubscriptions({ referenceid }: Props) {
         try {
             const { data, error } = await supabase
                 .from("service_subscriptions").select("*")
-                .eq("referenceid", referenceid)
                 .order("renewal_date", { ascending: true });
             if (error) throw error;
             setItems(data ?? []);

@@ -135,7 +135,6 @@ export const Supplies: React.FC<SuppliesProps> = ({ referenceid, dateCreatedFilt
         try {
             const { data, error } = await supabase
                 .from("supplies").select("*")
-                .eq("referenceid", referenceid)
                 .order("date_created", { ascending: false });
             if (error) throw error;
             setActivities(data ?? []);
