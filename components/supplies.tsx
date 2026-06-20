@@ -128,6 +128,11 @@ export const Supplies: React.FC<SuppliesProps> = ({ referenceid, dateCreatedFilt
     const [selectedIds,       setSelectedIds]       = useState<Set<string>>(new Set());
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
+    // Barcode scanner state
+    const [scannedBuffer, setScannedBuffer] = useState("");
+    const [lastKeyTime, setLastKeyTime] = useState(0);
+    const searchInputRef = React.useRef<HTMLInputElement>(null);
+
     // ── Fetch ─────────────────────────────────────────────────────────────────
     const fetchActivities = useCallback(async () => {
         if (!referenceid) { setActivities([]); return; }
@@ -145,6 +150,40 @@ export const Supplies: React.FC<SuppliesProps> = ({ referenceid, dateCreatedFilt
     }, [referenceid]);
 
     useEffect(() => { fetchActivities(); }, [fetchActivities]);
+
+    // ── Barcode Scanner ───────────────────────────────────────────────────────
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            const now = Date.now();
+            const timeDiff = now - lastKeyTime;
+
+            // Check if it's a printable character (not a modifier key)
+            if (e.key.length === 1) {
+                // If it's a fast keystroke (scanner), add to buffer
+                if (timeDiff < 100 || scannedBuffer.length > 0) {
+                    setScannedBuffer(prev => prev + e.key);
+                    setLastKeyTime(now);
+                }
+            } else if (e.key === "Enter" && scannedBuffer.length > 0) {
+                // Enter key means scan is complete
+                setSearch(scannedBuffer);
+                setPage(1);
+                setSelectedIds(new Set());
+                // Focus the search input
+                if (searchInputRef.current) {
+                    searchInputRef.current.focus();
+                }
+                // Clear buffer
+                setScannedBuffer("");
+            } else if (timeDiff > 500 && scannedBuffer.length > 0) {
+                // If no keys for 500ms, reset buffer (probably manual typing)
+                setScannedBuffer("");
+            }
+        };
+
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, [scannedBuffer, lastKeyTime]);
 
     // ── Realtime ──────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -271,7 +310,7 @@ export const Supplies: React.FC<SuppliesProps> = ({ referenceid, dateCreatedFilt
                         </div>
                         <div className="relative">
                             <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-mono select-none" style={{ color: "rgba(255,255,255,0.25)" }}>›</span>
-                            <input type="search" placeholder="FILTER..." value={search}
+                            <input type="search" placeholder="FILTER..." value={search} ref={searchInputRef}
                                 onChange={(e) => { setSearch(e.target.value); setPage(1); setSelectedIds(new Set()); }}
                                 className="pl-5 pr-3 py-1 text-[10px] font-mono uppercase tracking-widest border outline-none w-44 placeholder:opacity-30"
                                 style={{ backgroundColor: "rgba(255,255,255,0.03)", borderColor: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.6)" }} />
