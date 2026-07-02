@@ -21,12 +21,11 @@ const CreateSchema = z.object({
   username: z.string().max(255).optional().nullable(),
   password: z.string().min(1),
   notes: z.string().max(2000).optional().nullable(),
-  department: z.union([
-    z.enum(["IT", "HR", "ADMIN", "FINANCE", "MARKETING", "GENERAL"]),
-    z.literal(""),
-    z.null(),
-  ]).optional().nullable()
-    .transform((v) => (v === "" ? null : v)),
+  department: z.string().optional().nullable().transform((v) => {
+    if (!v || v.trim() === "") return null;
+    const valid = ["IT", "HR", "ADMIN", "FINANCE", "MARKETING", "GENERAL"];
+    return valid.includes(v.trim().toUpperCase()) ? v.trim().toUpperCase() : null;
+  }),
   tags: z.array(z.string()).max(20).optional().nullable(),
   is_favorite: z.boolean().optional().default(false),
   review_date: z.string().optional().nullable().transform((v) => (!v || v.trim() === "" ? null : v)),
