@@ -41,6 +41,8 @@ export function NavUser({
         setIsLoggingOut(true);
         try {
             await logLogoutActivity();
+            // Expire the session cookie server-side
+            await fetch("/api/auth/logout", { method: "POST" });
             localStorage.removeItem("userId");
             router.replace("/auth/login");
         } finally { setIsLoggingOut(false); setIsDialogOpen(false); }
