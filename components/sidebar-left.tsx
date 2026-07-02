@@ -16,6 +16,7 @@ import {
     ShieldCheck,
     BoxesIcon,
     CreditCard,
+    KeySquare,
 } from "lucide-react";
 
 import { NavFavorites } from "@/components/nav/favorites";
@@ -52,6 +53,7 @@ const data = {
                 { name: "Warranty",       url: "/asset/warranty",       icon: ShieldCheck   },
                 { name: "Supplies",       url: "/asset/supplies",       icon: BoxesIcon     },
                 { name: "Platform Plans", url: "/asset/service-subscriptions",  icon: CreditCard    },
+                { name: "Credential Vault", url: "/asset/credential-vault",       icon: KeySquare     },
             ],
         },
         {
